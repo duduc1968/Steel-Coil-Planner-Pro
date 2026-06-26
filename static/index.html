@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Steel Coil Planner Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12233f">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; margin: 0; background: #f4f6f8; color: #111; }
+    header { background: #12233f; color: white; padding: 18px; text-align: center; }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 5px 0 0; font-size: 13px; opacity: .85; }
+    main { max-width: 760px; margin: 0 auto; padding: 18px; }
+    .card { background: white; border-radius: 14px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+    label { display: block; font-weight: 600; margin-top: 12px; }
+    input { width: 100%; box-sizing: border-box; padding: 11px; border: 1px solid #ccd; border-radius: 9px; font-size: 16px; }
+    button { width: 100%; padding: 14px; margin-top: 18px; background: #1463ff; color: white; border: 0; border-radius: 10px; font-size: 17px; font-weight: 700; }
+    button:disabled { background: #999; }
+    .result a { display: block; background: #eef3ff; padding: 12px; border-radius: 10px; margin: 8px 0; text-decoration: none; color: #0645ad; font-weight: 600; }
+    img { width: 100%; border: 1px solid #ddd; border-radius: 12px; margin-top: 12px; }
+    .small { font-size: 13px; color: #555; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Steel Coil Planner Pro</h1>
+  <p>by Gabriel Duduc</p>
+</header>
+<main>
+  <div class="card">
+    <form id="form">
+      <label>Ship name</label>
+      <input name="ship_name" value="Default coaster">
+
+      <label>Hold name</label>
+      <input name="hold_name" value="Hold 1">
+
+      <label>Hold width (m)</label>
+      <input name="hold_width_m" value="11.5" inputmode="decimal">
+
+      <label>Hold length (m)</label>
+      <input name="hold_length_m" value="20.0" inputmode="decimal">
+
+      <label>Coil diameter (m)</label>
+      <input name="coil_diameter_m" value="1.8" inputmode="decimal">
+
+      <label>Row spacing (m)</label>
+      <input name="row_gap_m" value="0.15" inputmode="decimal">
+
+      <label>Central gap 3+3 (m)</label>
+      <input name="center_gap_m" value="0.70" inputmode="decimal">
+
+      <label>Cargo file CSV/XLSX</label>
+      <input type="file" name="cargo_file" accept=".csv,.xlsx,.xls" required>
+
+      <button id="btn" type="submit">CALCULATE LOADING PLAN</button>
+    </form>
+    <p class="small">Format: ID, Bredd_mm, Weight_kg<br>Pattern: 3 port + central gap + 3 starboard / 1 wedge / 4 upper</p>
+  </div>
+
+  <div id="result" class="card result" style="display:none;"></div>
+</main>
+
+<script>
+const form = document.getElementById('form');
+const btn = document.getElementById('btn');
+const result = document.getElementById('result');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  btn.disabled = true;
+  btn.textContent = 'Calculating...';
+  result.style.display = 'block';
+  result.innerHTML = 'Working...';
+
+  try {
+    const fd = new FormData(form);
+    const response = await fetch('/calculate', { method: 'POST', body: fd });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Calculation failed');
+
+    result.innerHTML = `
+      <h2>Result</h2>
+      <p><b>Coils:</b> ${data.coil_count}</p>
+      <p><b>Total weight:</b> ${data.total_weight_t.toFixed(1)} t</p>
+      <p><b>Used length:</b> ${data.used_length_m.toFixed(2)} m</p>
+      <p><b>Free length:</b> ${data.free_length_m.toFixed(2)} m</p>
+      <p><b>Status:</b> ${data.status}</p>
+      <a href="${data.png_url}" target="_blank">Open PNG plan</a>
+      <a href="${data.pdf_url}" target="_blank">Download PDF report</a>
+      <a href="${data.csv_url}" target="_blank">Download CSV plan</a>
+      <h3>Weight per block</h3>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+          <thead>
+            <tr>
+              <th style="text-align:left;border-bottom:1px solid #ddd;padding:6px;">Block</th>
+              <th style="text-align:right;border-bottom:1px solid #ddd;padding:6px;">Bottom t</th>
+              <th style="text-align:right;border-bottom:1px solid #ddd;padding:6px;">Wedge t</th>
+              <th style="text-align:right;border-bottom:1px solid #ddd;padding:6px;">Upper t</th>
+              <th style="text-align:right;border-bottom:1px solid #ddd;padding:6px;">Total t</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.block_weights.map(r => `
+              <tr>
+                <td style="padding:6px;">${r.Block}</td>
+                <td style="padding:6px;text-align:right;">${r.Bottom_t.toFixed(1)}</td>
+                <td style="padding:6px;text-align:right;">${r.Wedge_t.toFixed(1)}</td>
+                <td style="padding:6px;text-align:right;">${r.Upper_t.toFixed(1)}</td>
+                <td style="padding:6px;text-align:right;"><b>${r.Total_t.toFixed(1)}</b></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <img src="${data.png_url}" alt="Loading plan">
+    `;
+  } catch (err) {
+    result.innerHTML = `<b>Error:</b> ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'CALCULATE LOADING PLAN';
+  }
+});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

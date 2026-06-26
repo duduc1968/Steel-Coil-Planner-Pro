@@ -1,2 +1,49 @@
-# Steel-Coil-Planner-Pro
-Professional steel coil stowage planner
+# Steel Coil Planner Pro – Web App v0.1
+
+Versiune web pentru iPhone / iPad / Windows.
+
+## Cum se rulează local
+
+1. Instalează Python.
+2. Dezarhivează folderul.
+3. Rulează:
+
+```bash
+pip install -r requirements.txt
+python server.py
+```
+
+4. Deschide în browser:
+
+```text
+http://127.0.0.1:8000
+```
+
+## Pe iPhone
+
+Pentru iPhone, aplicația trebuie pusă pe un server web.
+După publicare, o deschizi în Safari și poți folosi:
+Share → Add to Home Screen.
+
+## Format cargo
+
+CSV sau Excel cu coloanele:
+
+- ID
+- Bredd_mm
+- Weight_kg
+
+
+
+## v0.3 update
+- Parametric Raahe geometry
+- Central gap field added
+- Better validation if pattern does not fit hold width
+- Ready for GitHub + Render deployment
+
+
+## v0.4 update
+- Better SSAB-style Excel import
+- Automatic header row detection for messy Excel files
+- Column normalization for ID / Bredd / Weight
+- Weight per block and tier returned in web result

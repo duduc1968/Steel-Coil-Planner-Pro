@@ -1,0 +1,15 @@
+{
+  "name": "Steel Coil Planner Pro",
+  "short_name": "Coil Planner",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#12233f",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
