@@ -61,3 +61,11 @@ CSV sau Excel cu coloanele:
 - Added professional product subtitle
 - Redesigned layout for desktop and iPhone
 - Kept PDF upload support
+
+
+## v1.0 Redesign
+- Full professional layout redesign
+- Sidebar for ship/hold parameters
+- Workspace for results and plan preview
+- Product-style header without personal byline
+- More suitable desktop/iPhone layout

@@ -4,132 +4,165 @@
   <meta charset="utf-8">
   <title>Steel Coil Planner Pro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#07111f">
   <link rel="manifest" href="/static/manifest.json">
   <link rel="apple-touch-icon" href="/static/icon.svg">
   <style>
-    :root {
-      --navy:#0f172a; --blue:#2563eb; --bg:#f3f6fa; --card:#ffffff;
-      --line:#d9e1ec; --muted:#64748b; --text:#0f172a;
+    :root{
+      --bg:#eef2f7; --panel:#ffffff; --ink:#0b1220; --muted:#667085; --line:#d7dee8;
+      --navy:#07111f; --navy2:#10233f; --blue:#2563eb; --green:#059669; --red:#dc2626;
+      --soft:#f8fafc; --accent:#e9f0ff;
     }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--text); }
-    header { background:linear-gradient(90deg,#0f172a,#1e3a8a); color:white; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; }
-    .brand { display:flex; gap:12px; align-items:center; }
-    .logo { width:38px; height:38px; border:2px solid rgba(255,255,255,.75); border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:800; letter-spacing:.5px; }
-    h1 { margin:0; font-size:22px; }
-    .subtitle { font-size:12px; opacity:.8; margin-top:2px; }
-    .about { font-size:13px; opacity:.85; }
-    main { max-width:1180px; margin:0 auto; padding:18px; }
-    .grid { display:grid; grid-template-columns:360px 1fr; gap:18px; align-items:start; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 2px 8px rgba(15,23,42,.06); }
-    .card h2 { margin:0; padding:14px 16px; font-size:15px; border-bottom:1px solid var(--line); background:#f8fafc; border-radius:16px 16px 0 0; }
-    .content { padding:16px; }
-    label { display:block; font-size:13px; font-weight:700; margin:12px 0 6px; }
-    input, select { width:100%; padding:11px; border:1px solid #cbd5e1; border-radius:10px; font-size:15px; background:white; }
-    button { width:100%; margin-top:16px; padding:14px; border:0; border-radius:12px; background:var(--blue); color:white; font-weight:800; font-size:15px; cursor:pointer; }
-    button:disabled { background:#94a3b8; }
-    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .hint { font-size:12px; color:var(--muted); margin-top:10px; line-height:1.35; }
-    .result-panel { min-height:420px; }
-    .empty { color:var(--muted); text-align:center; padding:70px 20px; border:2px dashed #cbd5e1; border-radius:14px; }
-    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
-    .stat { background:#f8fafc; border:1px solid var(--line); border-radius:12px; padding:12px; }
-    .stat b { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
-    .stat span { font-size:18px; font-weight:800; }
-    .links { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
-    .links a { padding:10px 12px; background:#eef3ff; color:#174ea6; border-radius:10px; text-decoration:none; font-weight:700; font-size:13px; }
-    table { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
-    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:right; }
-    th:first-child, td:first-child { text-align:left; }
-    img { width:100%; border:1px solid var(--line); border-radius:14px; margin-top:14px; background:white; }
-    .status-ok { color:#047857; font-weight:800; }
-    .status-bad { color:#b91c1c; font-weight:800; }
-    @media (max-width:850px) {
-      header { display:block; }
-      .about { margin-top:8px; }
-      .grid { grid-template-columns:1fr; }
-      .stats { grid-template-columns:1fr 1fr; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+    .appbar{
+      height:64px;background:linear-gradient(90deg,var(--navy),var(--navy2));color:white;
+      display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.08)
+    }
+    .brand{display:flex;align-items:center;gap:13px}
+    .mark{width:42px;height:42px;border-radius:12px;background:#ffffff12;border:1px solid #ffffff44;display:grid;place-items:center;font-weight:900}
+    .brand h1{font-size:21px;margin:0;letter-spacing:.2px}
+    .brand div:last-child span{display:block;font-size:12px;color:#cbd5e1;margin-top:2px}
+    .top-actions{font-size:13px;color:#cbd5e1}
+    .shell{max-width:1320px;margin:0 auto;padding:18px;display:grid;grid-template-columns:330px 1fr;gap:18px}
+    .side,.workspace{display:flex;flex-direction:column;gap:14px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 3px 14px rgba(15,23,42,.06);overflow:hidden}
+    .card-title{padding:13px 15px;background:var(--soft);border-bottom:1px solid var(--line);font-weight:800;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+    .card-body{padding:15px}
+    label{display:block;font-size:12px;font-weight:800;color:#344054;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.03em}
+    input,select{width:100%;padding:11px 12px;border:1px solid #cbd5e1;border-radius:11px;background:white;font-size:15px}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn{width:100%;border:0;border-radius:13px;padding:14px;background:var(--blue);color:white;font-weight:900;font-size:15px;margin-top:14px;cursor:pointer}
+    .btn:disabled{background:#94a3b8}
+    .muted{font-size:12px;color:var(--muted);line-height:1.35;margin-top:10px}
+    .pattern-box{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .pill{border:1px solid var(--line);background:#fff;border-radius:11px;padding:9px;text-align:center;font-size:13px;font-weight:700}
+    .pill.active{background:var(--accent);border-color:#9db7ff;color:#174ea6}
+    .hero{
+      background:linear-gradient(135deg,#ffffff,#f6f9ff);border:1px solid var(--line);border-radius:18px;
+      padding:18px;display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:center
+    }
+    .hero h2{margin:0 0 8px;font-size:22px}
+    .hero p{margin:0;color:var(--muted);line-height:1.45}
+    .mini-diagram{height:140px;background:#fff;border:1px solid var(--line);border-radius:14px;position:relative;overflow:hidden}
+    .coil{position:absolute;width:28px;height:28px;border:3px solid #1e3a8a;border-radius:50%;background:white}
+    .c1{left:30px;bottom:32px}.c2{left:64px;bottom:32px}.c3{left:98px;bottom:32px}
+    .c4{right:98px;bottom:32px}.c5{right:64px;bottom:32px}.c6{right:30px;bottom:32px}
+    .c7{left:116px;bottom:67px;border-color:#f59e0b}.c8{left:47px;bottom:73px}.c9{left:81px;bottom:73px}.c10{right:81px;bottom:73px}.c11{right:47px;bottom:73px}
+    .gap-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-weight:700}
+    .results{min-height:500px}
+    .empty{border:2px dashed #cbd5e1;border-radius:16px;padding:52px 18px;text-align:center;color:var(--muted);background:#fbfdff}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+    .stat{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:12px}
+    .stat b{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+    .stat span{font-size:18px;font-weight:900}
+    .status-ok{color:var(--green)} .status-bad{color:var(--red)}
+    .tools{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+    .tools a{background:#eef3ff;color:#174ea6;text-decoration:none;font-weight:800;border-radius:11px;padding:10px 12px;font-size:13px}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+    table{width:100%;border-collapse:collapse;font-size:13px;background:white;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    th,td{border-bottom:1px solid var(--line);padding:9px;text-align:right}
+    th{background:#f8fafc;color:#475467;font-size:12px;text-transform:uppercase}
+    th:first-child,td:first-child{text-align:left}
+    .plan-img{width:100%;border:1px solid var(--line);border-radius:16px;margin-top:14px;background:white}
+    .section-head{font-size:15px;font-weight:900;margin:16px 0 8px}
+    @media(max-width:980px){
+      .shell{grid-template-columns:1fr;padding:12px}
+      .hero{grid-template-columns:1fr}
+      .stats{grid-template-columns:1fr 1fr}
+      .split{grid-template-columns:1fr}
+      .appbar{height:auto;padding:14px;display:block}.top-actions{margin-top:8px}
     }
   </style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <div class="logo">SCP</div>
-    <div>
-      <h1>Steel Coil Planner Pro</h1>
-      <div class="subtitle">Professional steel coil stowage planning</div>
+  <header class="appbar">
+    <div class="brand">
+      <div class="mark">SCP</div>
+      <div><h1>Steel Coil Planner Pro</h1><span>Professional steel coil stowage planning</span></div>
     </div>
-  </div>
-  <div class="about">v0.6 · Web App</div>
-</header>
+    <div class="top-actions">v1.0 · Web App · Raahe Pattern</div>
+  </header>
 
-<main>
-  <div class="grid">
-    <section class="card">
-      <h2>Planning Parameters</h2>
-      <div class="content">
-        <form id="form">
-          <label>Ship</label>
-          <select name="ship_name">
-            <option>Default coaster</option>
-            <option>MV Drogdenbank</option>
-            <option>MV Varnebank</option>
-            <option>MV Vikingbank</option>
-          </select>
+  <main class="shell">
+    <aside class="side">
+      <section class="card">
+        <div class="card-title">Ship & Hold</div>
+        <div class="card-body">
+          <form id="form">
+            <label>Ship</label>
+            <select name="ship_name">
+              <option>Default coaster</option>
+              <option>MV Drogdenbank</option>
+              <option>MV Varnebank</option>
+              <option>MV Vikingbank</option>
+            </select>
 
-          <label>Hold</label>
-          <input name="hold_name" value="Hold 1">
+            <label>Hold</label>
+            <input name="hold_name" value="Hold 1">
 
-          <div class="row">
-            <div>
-              <label>Width (m)</label>
-              <input name="hold_width_m" value="11.5" inputmode="decimal">
+            <div class="two">
+              <div><label>Width</label><input name="hold_width_m" value="11.5" inputmode="decimal"></div>
+              <div><label>Length</label><input name="hold_length_m" value="20.0" inputmode="decimal"></div>
             </div>
-            <div>
-              <label>Length (m)</label>
-              <input name="hold_length_m" value="20.0" inputmode="decimal">
+
+            <div class="two">
+              <div><label>Coil Ø</label><input name="coil_diameter_m" value="1.8" inputmode="decimal"></div>
+              <div><label>Row spacing</label><input name="row_gap_m" value="0.15" inputmode="decimal"></div>
             </div>
+
+            <label>Central gap 3+3</label>
+            <input name="center_gap_m" value="0.70" inputmode="decimal">
+
+            <label>Cargo list</label>
+            <input type="file" name="cargo_file" accept=".csv,.xlsx,.xls,.pdf" required>
+
+            <button class="btn" id="btn" type="submit">CALCULATE LOADING PLAN</button>
+          </form>
+          <div class="muted">Accepted: CSV, Excel, PDF. PDF must contain selectable text/table data. Scanned PDF requires OCR, to be added later.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Stowage Pattern</div>
+        <div class="card-body">
+          <div class="pattern-box">
+            <div class="pill active">Raahe 3+3</div>
+            <div class="pill">Auto Optimize</div>
+            <div class="pill">4+4</div>
+            <div class="pill">Custom</div>
           </div>
+          <div class="muted">Current active model: 3 port + gap + 3 starboard, 1 wedge coil, 4 upper coils.</div>
+        </div>
+      </section>
+    </aside>
 
-          <div class="row">
-            <div>
-              <label>Coil Ø (m)</label>
-              <input name="coil_diameter_m" value="1.8" inputmode="decimal">
-            </div>
-            <div>
-              <label>Row spacing (m)</label>
-              <input name="row_gap_m" value="0.15" inputmode="decimal">
-            </div>
-          </div>
-
-          <label>Central gap 3+3 (m)</label>
-          <input name="center_gap_m" value="0.70" inputmode="decimal">
-
-          <label>Cargo list</label>
-          <input type="file" name="cargo_file" accept=".csv,.xlsx,.xls,.pdf" required>
-
-          <button id="btn" type="submit">CALCULATE LOADING PLAN</button>
-        </form>
-        <div class="hint">
-          Accepted files: CSV, Excel, PDF. Required data: ID, Bredd/Width, Weight/Vikt.
-          PDF works best when the text/table is selectable.
+    <section class="workspace">
+      <div class="hero">
+        <div>
+          <h2>Plan steel coil loading in minutes</h2>
+          <p>Upload the SSAB list, set hold dimensions and calculate a technical stowage plan with block weights and PDF export.</p>
+        </div>
+        <div class="mini-diagram">
+          <div class="coil c1"></div><div class="coil c2"></div><div class="coil c3"></div>
+          <div class="coil c4"></div><div class="coil c5"></div><div class="coil c6"></div>
+          <div class="coil c7"></div><div class="coil c8"></div><div class="coil c9"></div><div class="coil c10"></div><div class="coil c11"></div>
+          <div class="gap-label">3 + gap + 3 / wedge / 4</div>
         </div>
       </div>
-    </section>
 
-    <section class="card result-panel">
-      <h2>Loading Plan</h2>
-      <div class="content" id="result">
-        <div class="empty">
-          Upload cargo list and press <b>Calculate Loading Plan</b>.<br>
-          The loading plan, block weights and PDF export will appear here.
+      <section class="card results">
+        <div class="card-title">Loading Plan Output</div>
+        <div class="card-body" id="result">
+          <div class="empty">
+            <b>No calculation yet</b><br><br>
+            Select cargo file and press <b>Calculate Loading Plan</b>.<br>
+            Results, block weights, plan image and PDF export will appear here.
+          </div>
         </div>
-      </div>
+      </section>
     </section>
-  </div>
-</main>
+  </main>
 
 <script>
 const form = document.getElementById('form');
@@ -139,16 +172,16 @@ const result = document.getElementById('result');
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   btn.disabled = true;
-  btn.textContent = 'Calculating...';
-  result.innerHTML = '<div class="empty">Working... please wait.</div>';
+  btn.textContent = 'CALCULATING...';
+  result.innerHTML = '<div class="empty"><b>Working...</b><br><br>Reading cargo file and generating loading plan.</div>';
 
   try {
     const fd = new FormData(form);
-    const response = await fetch('/calculate', { method: 'POST', body: fd });
+    const response = await fetch('/calculate', { method:'POST', body:fd });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Calculation failed');
 
-    const statusClass = data.status === 'OK' ? 'status-ok' : 'status-bad';
+    const ok = data.status === 'OK';
     const blockRows = (data.block_weights || []).map(r => `
       <tr>
         <td>${r.Block}</td>
@@ -161,29 +194,36 @@ form.addEventListener('submit', async (e) => {
     result.innerHTML = `
       <div class="stats">
         <div class="stat"><b>Coils</b><span>${data.coil_count}</span></div>
-        <div class="stat"><b>Total weight</b><span>${data.total_weight_t.toFixed(1)} t</span></div>
-        <div class="stat"><b>Used length</b><span>${data.used_length_m.toFixed(2)} m</span></div>
-        <div class="stat"><b>Status</b><span class="${statusClass}">${data.status}</span></div>
+        <div class="stat"><b>Total</b><span>${data.total_weight_t.toFixed(1)} t</span></div>
+        <div class="stat"><b>Used</b><span>${data.used_length_m.toFixed(2)} m</span></div>
+        <div class="stat"><b>Free</b><span>${data.free_length_m.toFixed(2)} m</span></div>
+        <div class="stat"><b>Status</b><span class="${ok ? 'status-ok':'status-bad'}">${data.status}</span></div>
       </div>
 
-      <div class="links">
-        <a href="${data.png_url}" target="_blank">Open PNG</a>
+      <div class="tools">
+        <a href="${data.png_url}" target="_blank">Open Plan PNG</a>
         <a href="${data.pdf_url}" target="_blank">Download PDF</a>
         <a href="${data.csv_url}" target="_blank">Download CSV</a>
       </div>
 
-      <h3>Weight per block</h3>
-      <table>
-        <thead>
-          <tr><th>Block</th><th>Bottom t</th><th>Wedge t</th><th>Upper t</th><th>Total t</th></tr>
-        </thead>
-        <tbody>${blockRows}</tbody>
-      </table>
+      <div class="split">
+        <div>
+          <div class="section-head">Weight per block</div>
+          <table>
+            <thead><tr><th>Block</th><th>Bottom</th><th>Wedge</th><th>Upper</th><th>Total</th></tr></thead>
+            <tbody>${blockRows}</tbody>
+          </table>
+        </div>
+        <div>
+          <div class="section-head">Plan preview</div>
+          <div class="muted">Open PNG/PDF for full resolution.</div>
+        </div>
+      </div>
 
-      <img src="${data.png_url}" alt="Loading plan">
+      <img class="plan-img" src="${data.png_url}" alt="Loading plan">
     `;
   } catch (err) {
-    result.innerHTML = `<div class="empty"><b>Error:</b><br>${err.message}</div>`;
+    result.innerHTML = `<div class="empty"><b>Error</b><br><br>${err.message}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = 'CALCULATE LOADING PLAN';
