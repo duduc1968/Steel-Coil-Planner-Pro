@@ -54,3 +54,10 @@ CSV sau Excel cu coloanele:
 - Extracts PDF tables when possible
 - Text fallback parser for SSAB-style PDF lists
 - Scanned/image-only PDF needs OCR and is not yet fully supported
+
+
+## v0.6 update – Professional UI
+- Removed personal byline from main header
+- Added professional product subtitle
+- Redesigned layout for desktop and iPhone
+- Kept PDF upload support
