@@ -69,3 +69,10 @@ CSV sau Excel cu coloanele:
 - Workspace for results and plan preview
 - Product-style header without personal byline
 - More suitable desktop/iPhone layout
+
+
+## v2.0 Interactive
+- Interactive SVG top view
+- Click a coil to inspect ID / tier / weight / coordinates
+- Server returns coil coordinate data as JSON
+- Workspace-style layout

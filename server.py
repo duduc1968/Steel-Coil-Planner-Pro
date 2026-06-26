@@ -69,6 +69,14 @@ async def calculate(
         return {
             **s,
             "block_weights": block_weight_summary(plan),
+            "coils": plan.to_dict("records"),
+            "hold": {
+                "width_m": cfg["hold_width_m"],
+                "length_m": cfg["hold_length_m"],
+                "diameter_m": cfg["coil_diameter_m"],
+                "row_gap_m": cfg["row_gap_m"],
+                "center_gap_m": cfg.get("center_gap_m", 0.0),
+            },
             "job_id": job_id,
             "png_url": f"/results/{job_id}/loading_plan.png",
             "pdf_url": f"/results/{job_id}/loading_plan.pdf",
