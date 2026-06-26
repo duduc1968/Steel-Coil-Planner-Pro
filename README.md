@@ -47,3 +47,10 @@ CSV sau Excel cu coloanele:
 - Automatic header row detection for messy Excel files
 - Column normalization for ID / Bredd / Weight
 - Weight per block and tier returned in web result
+
+
+## v0.5 update – PDF support
+- Upload PDF in addition to CSV/XLSX
+- Extracts PDF tables when possible
+- Text fallback parser for SSAB-style PDF lists
+- Scanned/image-only PDF needs OCR and is not yet fully supported

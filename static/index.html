@@ -52,12 +52,12 @@
       <label>Central gap 3+3 (m)</label>
       <input name="center_gap_m" value="0.70" inputmode="decimal">
 
-      <label>Cargo file CSV/XLSX</label>
-      <input type="file" name="cargo_file" accept=".csv,.xlsx,.xls" required>
+      <label>Cargo file CSV/XLSX/PDF</label>
+      <input type="file" name="cargo_file" accept=".csv,.xlsx,.xls,.pdf" required>
 
       <button id="btn" type="submit">CALCULATE LOADING PLAN</button>
     </form>
-    <p class="small">Format: ID, Bredd_mm, Weight_kg<br>Pattern: 3 port + central gap + 3 starboard / 1 wedge / 4 upper</p>
+    <p class="small">Format: ID, Bredd_mm, Weight_kg. PDF is supported when text/table data is selectable.<br>Pattern: 3 port + central gap + 3 starboard / 1 wedge / 4 upper</p>
   </div>
 
   <div id="result" class="card result" style="display:none;"></div>

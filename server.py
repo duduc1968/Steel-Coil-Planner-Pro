@@ -40,8 +40,8 @@ async def calculate(
 ):
     try:
         suffix = Path(cargo_file.filename).suffix.lower()
-        if suffix not in [".csv", ".xlsx", ".xls"]:
-            raise HTTPException(status_code=400, detail="Please upload CSV/XLSX file.")
+        if suffix not in [".csv", ".xlsx", ".xls", ".pdf"]:
+            raise HTTPException(status_code=400, detail="Please upload CSV/XLSX/PDF file.")
 
         job_id = uuid4().hex[:10]
         upload_path = UPLOADS / f"{job_id}{suffix}"

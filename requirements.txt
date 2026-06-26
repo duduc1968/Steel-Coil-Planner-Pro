@@ -5,3 +5,5 @@ pandas
 matplotlib
 openpyxl
 jinja2
+
+pdfplumber
