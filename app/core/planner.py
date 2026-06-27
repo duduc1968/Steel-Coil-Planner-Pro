@@ -18,6 +18,65 @@ def _series_to_t(values):
     # Per-value auto-units: 18000 -> 18.000 t, while 18.0 stays 18.0 t.
     return s.where(s <= 200, s / 1000)
 
+
+def _balanced_positions_for_count(positions, count):
+    """Return the positions to use for a partly filled block.
+
+    Loading rule for wedge patterns:
+    - bottom tier is filled first;
+    - wedge/center coil is then placed;
+    - any upper coils are distributed around the wedge: even numbers are split
+      equally port/starboard; odd numbers get one extra on port;
+    - selected upper coils are placed in the valleys between bottom coils, closest
+      to the wedge first on each side.
+    """
+    positions = list(positions)
+    if count >= len(positions):
+        return positions
+
+    bottom = [p for p in positions if p[0] == "Bottom"]
+    wedge = [p for p in positions if p[0] in ("Wedge", "Center")]
+    upper = [p for p in positions if p[0] == "Upper"]
+
+    # For patterns without a wedge, preserve the original order.
+    if not wedge or not upper:
+        return positions[:count]
+
+    if count <= len(bottom):
+        return bottom[:count]
+
+    selected = bottom[:]
+    remaining = count - len(bottom)
+
+    selected.extend(wedge[:remaining])
+    remaining -= min(remaining, len(wedge))
+
+    if remaining <= 0:
+        return selected
+
+    wedge_y = float(wedge[0][2])
+    left = [p for p in upper if float(p[2]) < wedge_y]
+    right = [p for p in upper if float(p[2]) > wedge_y]
+
+    # Odd number: one extra to port/left. Even number: equal split.
+    left_n = (remaining + 1) // 2
+    right_n = remaining // 2
+
+    # Choose nearest available valleys to the wedge first, then display port-to-starboard.
+    chosen_left = sorted(sorted(left, key=lambda p: abs(float(p[2]) - wedge_y))[:left_n], key=lambda p: float(p[2]))
+    chosen_right = sorted(sorted(right, key=lambda p: abs(float(p[2]) - wedge_y))[:right_n], key=lambda p: float(p[2]))
+
+    # If one side has fewer available positions, fill from the other side.
+    missing = remaining - len(chosen_left) - len(chosen_right)
+    if missing > 0:
+        already = set(id(p) for p in chosen_left + chosen_right)
+        extras = [p for p in sorted(upper, key=lambda p: abs(float(p[2]) - wedge_y)) if id(p) not in already]
+        extra_chosen = sorted(extras[:missing], key=lambda p: float(p[2]))
+        chosen_left = sorted(chosen_left + [p for p in extra_chosen if float(p[2]) < wedge_y], key=lambda p: float(p[2]))
+        chosen_right = sorted(chosen_right + [p for p in extra_chosen if float(p[2]) > wedge_y], key=lambda p: float(p[2]))
+
+    return selected + chosen_left + chosen_right
+
 def make_plan(cargo_df: pd.DataFrame, cfg: dict):
     cargo = cargo_df.copy()
     required = {"ID", "Width", "Weight"}
@@ -50,7 +109,9 @@ def make_plan(cargo_df: pd.DataFrame, cfg: dict):
         group = cargo.iloc[start:start + cap]
         block_len = float(group["Width_m"].max())
 
-        for (_, coil), pos in zip(group.iterrows(), positions):
+        block_positions = _balanced_positions_for_count(positions, len(group))
+
+        for (_, coil), pos in zip(group.iterrows(), block_positions):
             tier, pos_name, y, z = pos
             row = {
                 "Block": block_no,

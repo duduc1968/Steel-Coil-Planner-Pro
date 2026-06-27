@@ -1,12 +1,12 @@
-# Steel Coil Planner Pro v4.4 – Final View Refinement Test Build
+# Steel Coil Planner Pro v4.5 – Upper Tier Distribution Rule
 
-This build restores the original Top View philosophy and keeps the corrected Cross Section.
-
-## Included
-- Top View returned to the original longitudinal-block concept.
-- Top View coil graphics reduced to the original readable proportions.
-- Cross Section keeps Tier 2 positioned between Tier 1 coils.
-- Wedge remains shown separately and correctly in Cross Section.
-- Ship Library and Planning Engine from previous builds retained.
-
-Test this build as the final UI reference before continuing with Cargo Manager and Geometry Engine.
+Changes:
+- Implemented the Geometry Engine rule for partly filled upper tiers.
+- Upper coils are distributed around the wedge:
+  - 2 upper coils: 1 port + 1 starboard
+  - 3 upper coils: 2 port + 1 starboard
+  - 4 upper coils: 2 port + 2 starboard
+  - 5 upper coils: 3 port + 2 starboard
+- Upper coils are placed in the valleys between bottom coils, closest to the wedge first.
+- Top View remains the approved longitudinal block view.
+- Cross Section remains the approved real stacking view.
