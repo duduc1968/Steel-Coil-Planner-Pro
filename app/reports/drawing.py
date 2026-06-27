@@ -4,6 +4,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 
+def _tier_color(tier):
+    return {"Bottom":"#16a34a", "Wedge":"#facc15", "Center":"#facc15", "Upper":"#2563eb"}.get(str(tier), "#64748b")
+
 def draw_plan(plan, positions, cfg, output_dir):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -25,7 +28,7 @@ def draw_plan(plan, positions, cfg, output_dir):
     ax.add_patch(Rectangle((0, 0), hold_w, 5.9, fill=False, lw=2))
     for tier, pos, y, z in positions:
         hatch = "//" if tier in ["Upper", "Wedge", "Center"] else None
-        ax.add_patch(Circle((y, z), r, fill=False, lw=2, hatch=hatch))
+        ax.add_patch(Circle((y, z), r, facecolor=_tier_color(tier), edgecolor="#0f172a", lw=2, alpha=0.85, hatch=hatch))
         ax.text(y, z, pos, ha="center", va="center", fontsize=10)
     ax.text(hold_w / 2, -0.35, f"Hold width {hold_w:.2f} m", ha="center", weight="bold")
     ax.set_xlim(-0.2, hold_w + 0.2)
@@ -37,9 +40,9 @@ def draw_plan(plan, positions, cfg, output_dir):
     ax2.set_title("Top view – each coil shown with its own width", fontsize=13, weight="bold")
     ax2.add_patch(Rectangle((0, 0), hold_l, hold_w, fill=False, lw=2))
     for _, row in plan.iterrows():
-        h = 0.42
+        h = max(0.55, min(0.95, float(row.get("Diameter_m", D)) * 0.32))
         hatch = "//" if row["Tier"] in ["Upper", "Wedge", "Center"] else None
-        ax2.add_patch(Rectangle((row["x0_m"], row["y_m"] - h/2), row["Width_m"], h, fill=False, lw=1.4, hatch=hatch))
+        ax2.add_patch(Rectangle((row["x0_m"], row["y_m"] - h/2), row["Width_m"], h, facecolor=_tier_color(row["Tier"]), edgecolor="#0f172a", alpha=0.85, lw=1.4, hatch=hatch))
         ax2.text(row["x0_m"] + row["Width_m"]/2, row["y_m"], row["Position"], ha="center", va="center", fontsize=8)
 
     for block, group in plan.groupby("Block"):

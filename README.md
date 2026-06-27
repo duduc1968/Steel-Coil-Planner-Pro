@@ -1,8 +1,8 @@
-# Steel Coil Planner Pro v4.2 beta – Ship Library Test Build
+# Steel Coil Planner Pro v4.3 beta – View Refinement Test Build
 
-This build adds the first functional Ship Library module.
+This build refines Top View colors and Cross Section geometry while keeping the longitudinal Top View logic.
 
-## New in v4.2
+## New in v4.3
 - Ship Library button opens a working modal.
 - Save ship / hold geometry to `config/ships/*.json`.
 - Load saved ship data back into Voyage Setup.

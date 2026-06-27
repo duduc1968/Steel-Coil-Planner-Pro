@@ -110,18 +110,22 @@ def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, 
     z0 = r + 0.20
     z_step = math.sqrt(max(D**2 - (D / 2)**2, 0))
     last_y = []
+    support_y = []  # last real supporting row; wedge/center does not replace it
+    upper_level = 1
     for level, token in enumerate(tiers):
         low = token.lower().replace(' ', '')
-        z = z0 + level * z_step
+        # Geometrical tier: bottom is tier 1; wedge and all rows above it are tier 2.
+        z = z0 if level == 0 else z0 + z_step
         if low in ["wedge", "center", "centre", "c", "w"]:
             y = W / 2
-            if len(last_y) >= 2:
-                left = max([v for v in last_y if v <= y], default=None)
-                right = min([v for v in last_y if v >= y], default=None)
+            base = support_y or last_y
+            if len(base) >= 2:
+                left = max([v for v in base if v <= y], default=None)
+                right = min([v for v in base if v >= y], default=None)
                 if left is not None and right is not None and right > left:
                     dx = (right - left) / 2
                     if dx < D:
-                        z = (z0 + (level-1)*z_step) + math.sqrt(max(D**2 - dx**2, 0))
+                        z = z0 + math.sqrt(max(D**2 - dx**2, 0))
             tier_name = "Wedge" if low.startswith('w') else "Center"
             positions.append((tier_name, f"{tier_name[0]}1", y, z))
             last_y = [y]
@@ -135,14 +139,33 @@ def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, 
             else:
                 raise ValueError(f"Cannot read custom tier '{token}'. Use e.g. 3+3, 6, Wedge, Center.")
         elif low.isdigit():
-            ys = _row_centers(int(low), W, D)
+            n = int(low)
+            base = support_y or last_y
+            # If possible, upper rows sit in the valleys between the lower row.
+            # Example: 3+3 / Wedge / 4 => the 4 upper coils sit between the 6 bottom coils,
+            # two on port side and two on starboard side, while the wedge is also tier 2.
+            if level > 0 and len(base) >= 2 and n <= len(base) - 1:
+                gaps = [(base[i+1] - base[i], (base[i] + base[i+1]) / 2) for i in range(len(base)-1)]
+                valid = [(dist, mid) for dist, mid in gaps if dist <= D * 1.35]
+                if len(valid) >= n:
+                    # Prefer real touching/near-touching gaps and keep port-to-starboard order.
+                    ys = [mid for _, mid in valid[:n]]
+                else:
+                    ys = _row_centers(n, W, D)
+            else:
+                ys = _row_centers(n, W, D)
         else:
             raise ValueError(f"Cannot read custom tier '{token}'. Use e.g. 3+3, 6, Wedge, Center.")
         tier_name = "Bottom" if level == 0 else "Upper"
-        prefix = "B" if level == 0 else f"U{level}-"
+        prefix = "B" if level == 0 else f"U2-"
         for i, y in enumerate(ys):
             positions.append((tier_name, f"{prefix}{i+1}", y, z))
         last_y = ys
+        if tier_name == "Bottom":
+            support_y = ys
+        elif ys:
+            support_y = support_y or ys
+        upper_level += 1
     return positions
 
 def positions_for_pattern(pattern: str, hold_width_m: float, diameter_m: float, center_gap_m: float | None = None, custom_pattern: str | None = None):
