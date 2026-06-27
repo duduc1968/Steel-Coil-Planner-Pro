@@ -72,7 +72,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v2.1 · Row Arrangement + Flexible Cargo Units</div>
+    <div class="version">v3.0 beta · Pattern Builder + Flexible Cargo Units</div>
   </header>
 
   <main class="app">
@@ -110,12 +110,27 @@
             <option value="three_center_three">3 + Center + 3</option>
             <option value="four_center_four">4 + Center + 4</option>
             <option value="custom">Custom / Manual</option>
+            <option value="builder">Pattern Builder</option>
           </select>
 
           <div id="customPatternBox" style="display:none">
             <label>Custom row arrangement</label>
             <input name="custom_pattern" id="customPattern" value="3+3 / Wedge / 4" placeholder="Example: 3+3 / Wedge / 4 or 6 / 5 / 4">
             <div class="hint" style="margin-top:6px">Use / for tiers from bottom upwards. Examples: 3+3 / Wedge / 4, 6 / 5 / 4, 4+4 / Center / 3.</div>
+          </div>
+
+          <div id="builderBox" style="display:none">
+            <label>Pattern Builder</label>
+            <div class="two">
+              <div><label>Bottom port</label><input id="builderPort" value="3" inputmode="numeric"></div>
+              <div><label>Bottom starboard</label><input id="builderStbd" value="3" inputmode="numeric"></div>
+            </div>
+            <div class="two">
+              <div><label>Wedge</label><select id="builderWedge"><option value="yes">Yes</option><option value="no">No</option></select></div>
+              <div><label>Upper row</label><input id="builderUpper" value="4" inputmode="numeric"></div>
+            </div>
+            <input type="hidden" name="builder_pattern" id="builderPattern" value="3+3 / Wedge / 4">
+            <div class="hint" id="builderPreview" style="margin-top:6px">Builder pattern: 3+3 / Wedge / 4</div>
           </div>
 
           <label>Central gap m</label>
@@ -192,13 +207,40 @@ const stowagePattern = document.getElementById('stowagePattern');
 const activePatternTool = document.getElementById('activePatternTool');
 const customPatternBox = document.getElementById('customPatternBox');
 const customPattern = document.getElementById('customPattern');
+const builderBox = document.getElementById('builderBox');
+const builderPort = document.getElementById('builderPort');
+const builderStbd = document.getElementById('builderStbd');
+const builderWedge = document.getElementById('builderWedge');
+const builderUpper = document.getElementById('builderUpper');
+const builderPattern = document.getElementById('builderPattern');
+const builderPreview = document.getElementById('builderPreview');
+function buildPatternText(){
+  const p = parseInt(builderPort.value || '0', 10);
+  const s = parseInt(builderStbd.value || '0', 10);
+  const u = parseInt(builderUpper.value || '0', 10);
+  let parts = [];
+  if(p > 0 && s > 0) parts.push(`${p}+${s}`);
+  else if(p + s > 0) parts.push(`${p+s}`);
+  if(builderWedge.value === 'yes') parts.push('Wedge');
+  if(u > 0) parts.push(`${u}`);
+  return parts.join(' / ') || 'Custom / Manual';
+}
 function updatePatternUI(){
   const isCustom = stowagePattern.value === 'custom';
+  const isBuilder = stowagePattern.value === 'builder';
   customPatternBox.style.display = isCustom ? 'block' : 'none';
-  activePatternTool.textContent = isCustom ? (customPattern.value || 'Custom / Manual') : stowagePattern.options[stowagePattern.selectedIndex].text;
+  builderBox.style.display = isBuilder ? 'block' : 'none';
+  const built = buildPatternText();
+  builderPattern.value = built;
+  builderPreview.textContent = `Builder pattern: ${built}`;
+  if(isCustom) activePatternTool.textContent = customPattern.value || 'Custom / Manual';
+  else if(isBuilder) activePatternTool.textContent = built;
+  else activePatternTool.textContent = stowagePattern.options[stowagePattern.selectedIndex].text;
 }
 stowagePattern.addEventListener('change', updatePatternUI);
 customPattern.addEventListener('input', updatePatternUI);
+[builderPort,builderStbd,builderWedge,builderUpper].forEach(el => el.addEventListener('input', updatePatternUI));
+[builderWedge].forEach(el => el.addEventListener('change', updatePatternUI));
 updatePatternUI();
 document.getElementById('cargoFile').addEventListener('change', e => {
   uploadState.textContent = e.target.files[0] ? e.target.files[0].name : 'No file';

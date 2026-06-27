@@ -35,7 +35,7 @@ def make_plan(cargo_df: pd.DataFrame, cfg: dict):
         planning_diameter = float(cfg["coil_diameter_m"])
 
     cfg["planning_diameter_m"] = planning_diameter
-    positions = positions_for_pattern(cfg.get("stowage_pattern"), cfg["hold_width_m"], planning_diameter, cfg.get("center_gap_m"))
+    positions = positions_for_pattern(cfg.get("stowage_pattern"), cfg["hold_width_m"], planning_diameter, cfg.get("center_gap_m"), cfg.get("effective_custom_pattern", cfg.get("custom_pattern")))
     cap = len(positions)
 
     rows = []
@@ -83,6 +83,6 @@ def summary(plan: pd.DataFrame, cfg: dict):
         "status": "OK" if free_len >= 0 else "NOT FITTING",
         "blocks": int(plan["Block"].max()) if len(plan) else 0,
         "stowage_pattern": pattern_key,
-        "stowage_pattern_label": PATTERN_LABELS.get(pattern_key, pattern_key),
+        "stowage_pattern_label": cfg.get("stowage_pattern_label") or PATTERN_LABELS.get(pattern_key, pattern_key),
         "planning_diameter_m": float(cfg.get("planning_diameter_m", cfg.get("coil_diameter_m", 0))),
     }

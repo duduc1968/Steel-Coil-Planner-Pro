@@ -8,6 +8,7 @@ PATTERN_LABELS = {
     "three_center_three": "3 + Center + 3",
     "four_center_four": "4 + Center + 4",
     "custom": "Custom / Manual",
+    "builder": "Pattern Builder",
 }
 
 def _check_width(required, W, name):
@@ -160,6 +161,6 @@ def positions_for_pattern(pattern: str, hold_width_m: float, diameter_m: float, 
         return split_with_center_positions(3, W, D, gap, "3 + Center + 3")
     if pattern == "four_center_four":
         return split_with_center_positions(4, W, D, gap, "4 + Center + 4")
-    if pattern == "custom":
+    if pattern in ["custom", "builder"]:
         return custom_positions(custom_pattern or "", W, D, gap)
     raise ValueError(f"Unknown row arrangement: {pattern}")
