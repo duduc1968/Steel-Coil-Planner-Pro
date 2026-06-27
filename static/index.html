@@ -79,7 +79,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v3.1 beta · Top / Section / 3D View</div>
+    <div class="version">v3.2 beta · Geometry Engine View</div>
   </header>
 
   <main class="app">
@@ -146,7 +146,7 @@
           <label>Cargo list</label>
           <input id="cargoFile" type="file" name="cargo_file" accept=".csv,.xlsx,.xls,.pdf" required>
 
-          <button class="btn" id="btn" type="submit">CALCULATE</button>
+          <button class="btn" id="btn" type="submit">GENERATE LAYOUT</button>
         </form>
         <div class="hint">Accepted: CSV, Excel, PDF. Use English columns: ID, Width, Weight, optional Diameter. Values are auto-converted to m and tonnes (mm/kg or m/t).</div>
       </div>
@@ -311,7 +311,7 @@ function drawSectionView(data){
     const r = d/2*scale;
     const cx = pad + Number(c.y_m)*scale;
     const cy = baseY - Number(c.z_m)*scale;
-    const circ = svgEl(sectionSvg,'circle',{cx,cy,r,fill:tierColor(c.Tier),stroke:'#0f172a','stroke-width':2,opacity:.9,style:'cursor:pointer'});
+    const circ = svgEl(sectionSvg,'circle',{cx,cy,r,fill:coilColor(c),stroke:'#0f172a','stroke-width':2,opacity:.9,style:'cursor:pointer'});
     circ.addEventListener('click', () => showCoilDetails(c));
     const txt = svgEl(sectionSvg,'text',{x:cx,y:cy+4,fill:'#fff','font-size':12,'font-weight':800,'text-anchor':'middle','pointer-events':'none'});
     txt.textContent = c.Position;
@@ -334,7 +334,7 @@ function drawIsoCylinder(c, hold){
   const length = Math.max(10, Math.hypot(bX-aX,bY-aY));
   const angle = Math.atan2(bY-aY,bX-aX) * 180 / Math.PI;
   const g = svgEl(threeDSvg,'g',{transform:`translate(${aX} ${aY}) rotate(${angle})`,style:'cursor:pointer'});
-  const color = tierColor(c.Tier);
+  const color = coilColor(c);
   const body = svgEl(g,'rect',{x:0,y:-8,width:length,height:16,rx:8,fill:color,stroke:'#0f172a','stroke-width':1,opacity:.88});
   svgEl(g,'ellipse',{cx:0,cy:0,rx:8,ry:8,fill:color,stroke:'#0f172a','stroke-width':1});
   svgEl(g,'ellipse',{cx:length,cy:0,rx:8,ry:8,fill:'#ffffff',stroke:'#0f172a','stroke-width':1,opacity:.45});
@@ -373,6 +373,20 @@ function tierColor(tier){
   if(tier === 'Center') return '#7c3aed';
   return '#059669';
 }
+function weightColor(w){
+  w = Number(w)||0;
+  if(w < 16) return '#16a34a';
+  if(w < 22) return '#ca8a04';
+  if(w < 28) return '#ea580c';
+  return '#dc2626';
+}
+function coilColor(c){ return weightColor(c.Weight_t); }
+function addTooltip(el, c){
+  const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+  title.textContent = `${c.ID} · ${Number(c.Weight_t).toFixed(1)} t · ${Number(c.Width_m).toFixed(2)} m · ${c.Tier} ${c.Position}`;
+  el.appendChild(title);
+}
+
 
 function drawInteractivePlan(data){
   const coils = data.coils || [];
@@ -411,21 +425,30 @@ function drawInteractivePlan(data){
   coils.forEach(c => {
     const x = pad + c.x0_m * scaleX;
     const y = pad + c.y_m * scaleY;
-    const w = Math.max(c.Width_m * scaleX, 10);
-    const h = 16;
-    const rect = el('rect', {
-      x:x, y:y-h/2, width:w, height:h, rx:3,
-      fill:tierColor(c.Tier), stroke:'#0f172a', 'stroke-width':0.8, opacity:0.88,
-      style:'cursor:pointer'
-    });
-    rect.addEventListener('click', () => showCoilDetails(c));
-
-    const text = el('text', {
-      x:x+w/2, y:y+4, fill:'#ffffff', 'font-size':8, 'font-weight':'700',
-      'text-anchor':'middle', 'pointer-events':'none'
-    });
+    const w = Math.max(c.Width_m * scaleX, 14);
+    const d = Number(c.Diameter_m) || hold.diameter_m || 1.8;
+    const h = Math.min(Math.max(d * scaleY * 0.18, 14), 28);
+    const color = coilColor(c);
+    const g = el('g', {style:'cursor:pointer'});
+    const body = document.createElementNS(ns,'rect');
+    Object.entries({x:x, y:y-h/2, width:w, height:h, rx:h/2, fill:color, stroke:'#0f172a', 'stroke-width':0.8, opacity:0.9}).forEach(([k,v]) => body.setAttribute(k,v));
+    g.appendChild(body);
+    const e1 = document.createElementNS(ns,'ellipse');
+    Object.entries({cx:x, cy:y, rx:h/2, ry:h/2, fill:color, stroke:'#0f172a', 'stroke-width':0.8}).forEach(([k,v]) => e1.setAttribute(k,v));
+    g.appendChild(e1);
+    const e2 = document.createElementNS(ns,'ellipse');
+    Object.entries({cx:x+w, cy:y, rx:h/2, ry:h/2, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':0.8, opacity:.38}).forEach(([k,v]) => e2.setAttribute(k,v));
+    g.appendChild(e2);
+    addTooltip(g,c);
+    g.addEventListener('click', () => showCoilDetails(c));
+    const text = document.createElementNS(ns,'text');
+    Object.entries({x:x+w/2, y:y+4, fill:'#ffffff', 'font-size':8, 'font-weight':'700', 'text-anchor':'middle', 'pointer-events':'none'}).forEach(([k,v]) => text.setAttribute(k,v));
     text.textContent = c.Position;
+    g.appendChild(text);
   });
+
+  const key = el('text', {x:pad+10, y:H-18, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
+  key.textContent = 'Color by weight: green <16t · yellow 16–22t · orange 22–28t · red >28t';
 
   lastPlanData = data;
   emptyPlan.style.display = 'none';
@@ -438,7 +461,7 @@ function drawInteractivePlan(data){
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   btn.disabled = true;
-  btn.textContent = 'CALCULATING...';
+  btn.textContent = 'GENERATING...';
   summaryBox.innerHTML = '<div class="details">Working...</div>';
   weightsBox.innerHTML = '<div class="details">Working...</div>';
 
@@ -453,7 +476,7 @@ form.addEventListener('submit', async (e) => {
         <div class="stat"><b>Coils</b><span>${data.coil_count}</span></div>
         <div class="stat"><b>Total weight</b><span>${data.total_weight_t.toFixed(1)} t</span></div>
         <div class="stat"><b>Used</b><span>${data.used_length_m.toFixed(2)} m</span></div>
-        <div class="stat"><b>Free</b><span>${data.free_length_m.toFixed(2)} m</span></div>
+        <div class="stat"><b>Free</b><span>${data.free_length_m.toFixed(2)} m</span></div><div class="stat"><b>Use</b><span>${(data.used_length_m / data.hold.length_m * 100).toFixed(0)}%</span></div>
       </div>
       <div class="details"><b>Pattern:</b> ${data.stowage_pattern_label}<br><b>Planning diameter:</b> ${data.planning_diameter_m.toFixed(2)} m<br><b>Status:</b> <span class="${data.status === 'OK' ? 'ok':'bad'}">${data.status}</span></div>
       <div class="links">
@@ -479,7 +502,7 @@ form.addEventListener('submit', async (e) => {
     summaryBox.innerHTML = `<div class="details"><b>Error:</b><br>${err.message}</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'CALCULATE';
+    btn.textContent = 'GENERATE LAYOUT';
   }
 });
 
