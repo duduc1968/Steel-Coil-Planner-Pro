@@ -1,8 +1,9 @@
 from pathlib import Path
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from app.io.cargo_reader import read_cargo
 from app.core.planner import make_plan, summary
@@ -13,8 +14,10 @@ from app.reports.weight_report import block_weight_summary
 ROOT = Path(__file__).parent
 UPLOADS = ROOT / "uploads"
 RESULTS = ROOT / "results"
+SHIPS = ROOT / "config" / "ships"
 UPLOADS.mkdir(exist_ok=True)
 RESULTS.mkdir(exist_ok=True)
+SHIPS.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Steel Coil Planner Pro")
 
@@ -27,6 +30,60 @@ app.mount("/results", StaticFiles(directory=RESULTS), name="results")
 
 def to_float(value: str):
     return float(str(value).replace(",", "."))
+
+
+class ShipHold(BaseModel):
+    ship_name: str = Field(..., min_length=1)
+    hold_name: str = Field("Hold 1")
+    hold_width_m: float
+    hold_length_m: float
+    hold_depth_m: float | None = None
+    max_stack_height_m: float | None = None
+    tank_top_limit_t_m2: float | None = None
+    bilge_radius_m: float | None = None
+    hopper_angle_deg: float | None = None
+    hatch_opening_width_m: float | None = None
+    frame_spacing_m: float | None = None
+    coil_diameter_m: float = 1.8
+    row_gap_m: float = 0.15
+    center_gap_m: float = 0.70
+    stowage_pattern: str = "raahe_3_3_wedge_4"
+
+def ship_file_name(name: str) -> str:
+    safe = ''.join(ch if ch.isalnum() or ch in ('-', '_') else '_' for ch in name.strip())
+    return safe[:80] or 'ship'
+
+def load_ship_files():
+    import json
+    ships = []
+    for f in sorted(SHIPS.glob('*.json')):
+        try:
+            data = json.loads(f.read_text(encoding='utf-8'))
+            data['_file'] = f.name
+            ships.append(data)
+        except Exception:
+            continue
+    return ships
+
+@app.get('/api/ships')
+def list_ships():
+    return {'ships': load_ship_files()}
+
+@app.post('/api/ships')
+def save_ship(ship: ShipHold):
+    import json
+    data = ship.model_dump()
+    path = SHIPS / f"{ship_file_name(ship.ship_name)}.json"
+    path.write_text(json.dumps(data, indent=2), encoding='utf-8')
+    return {'status': 'saved', 'ship': data, 'file': path.name}
+
+@app.delete('/api/ships/{file_name}')
+def delete_ship(file_name: str):
+    path = SHIPS / Path(file_name).name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail='Ship file not found.')
+    path.unlink()
+    return {'status': 'deleted', 'file': path.name}
 
 @app.post("/import-cargo")
 async def import_cargo(cargo_file: UploadFile = File(...)):

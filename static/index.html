@@ -64,12 +64,25 @@
     .legend span{display:inline-flex;align-items:center;gap:5px;margin-right:10px}
     .dot{width:11px;height:11px;border-radius:50%;display:inline-block}.bottom{background:#1d4ed8}.wedge{background:#f59e0b}.upper{background:#059669}
     .uploadState{font-size:12px;color:var(--muted)}
+
+    .modalOverlay{position:fixed;inset:0;background:rgba(2,6,23,.72);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+    .modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#0f172a;border:1px solid #334155;border-radius:18px;box-shadow:0 20px 80px rgba(0,0,0,.45)}
+    .modalHeader{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#162033;border-bottom:1px solid #334155}
+    .modalHeader h2{font-size:18px;margin:0}.closeBtn{background:#1f2937;border:1px solid #475569;color:#e5edf7;border-radius:10px;padding:8px 11px;cursor:pointer;font-weight:900}
+    .modalBody{display:grid;grid-template-columns:260px 1fr;gap:14px;padding:14px}
+    .shipList{background:#111827;border:1px solid #334155;border-radius:14px;padding:10px;min-height:400px}
+    .shipItem{padding:10px;border:1px solid #334155;border-radius:10px;margin-bottom:8px;cursor:pointer;background:#0b1220}
+    .shipItem.active{border-color:#60a5fa;background:#13264a}
+    .shipItem b{display:block}.shipItem span{font-size:12px;color:var(--muted)}
+    .miniBtn{border:1px solid #334155;background:#111827;color:#e5edf7;border-radius:10px;padding:10px 11px;font-weight:800;cursor:pointer}
+    .miniBtn.blue{background:#1d4ed8;border-color:#60a5fa}.miniBtn.red{background:#7f1d1d;border-color:#ef4444}
+    .modalActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.formGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     @media(max-width:1050px){
-      .app{grid-template-columns:1fr}.main-grid{grid-template-columns:1fr}.plan-wrap{height:520px}
+      .app{grid-template-columns:1fr}.main-grid{grid-template-columns:1fr}.plan-wrap{height:520px}.modalBody{grid-template-columns:1fr}.formGrid{grid-template-columns:1fr 1fr}
     }
     @media(max-width:650px){
       .topbar{height:auto;padding:12px;display:block}.version{margin-top:6px}
-      .app{padding:8px}.stats{grid-template-columns:1fr}.plan-wrap{height:420px}
+      .app{padding:8px}.stats{grid-template-columns:1fr}.plan-wrap{height:420px}.formGrid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -79,7 +92,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v4.1 beta · Planning Engine Test Build</div>
+    <div class="version">v4.2 beta · Ship Library Test Build</div>
   </header>
 
   <main class="app">
@@ -88,7 +101,7 @@
       <div class="panel-body">
         <form id="form">
           <label>Ship</label>
-          <select name="ship_name">
+          <select name="ship_name" id="shipName">
             <option>Default coaster</option>
             <option>MV Drogdenbank</option>
             <option>MV Varnebank</option>
@@ -96,21 +109,21 @@
           </select>
 
           <label>Hold</label>
-          <input name="hold_name" value="Hold 1">
+          <input name="hold_name" id="holdName" value="Hold 1">
 
           <div class="two">
-            <div><label>Width m</label><input name="hold_width_m" value="11.5" inputmode="decimal"></div>
-            <div><label>Length m</label><input name="hold_length_m" value="20.0" inputmode="decimal"></div>
+            <div><label>Width m</label><input name="hold_width_m" id="holdWidth" value="11.5" inputmode="decimal"></div>
+            <div><label>Length m</label><input name="hold_length_m" id="holdLength" value="20.0" inputmode="decimal"></div>
           </div>
 
           <div class="two">
-            <div><label>Diameter m</label><input name="coil_diameter_m" value="1.8" inputmode="decimal"></div>
-            <div><label>Row gap m</label><input name="row_gap_m" value="0.15" inputmode="decimal"></div>
+            <div><label>Diameter m</label><input name="coil_diameter_m" id="coilDiameter" value="1.8" inputmode="decimal"></div>
+            <div><label>Row gap m</label><input name="row_gap_m" id="rowGap" value="0.15" inputmode="decimal"></div>
           </div>
 
           <div class="two">
-            <div><label>Max stack height m</label><input name="max_stack_height_m" value="" placeholder="optional" inputmode="decimal"></div>
-            <div><label>Tank top limit t/m²</label><input name="tank_top_limit_t_m2" value="" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Max stack height m</label><input name="max_stack_height_m" id="maxStackHeight" value="" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Tank top limit t/m²</label><input name="tank_top_limit_t_m2" id="tankTopLimit" value="" placeholder="optional" inputmode="decimal"></div>
           </div>
 
           <label>Row Arrangement</label>
@@ -146,7 +159,7 @@
           </div>
 
           <label>Central gap m</label>
-          <input name="center_gap_m" value="0.70" inputmode="decimal">
+          <input name="center_gap_m" id="centerGap" value="0.70" inputmode="decimal">
 
           <label>Cargo list</label>
           <input id="cargoFile" type="file" name="cargo_file" accept=".csv,.xlsx,.xls,.pdf" required>
@@ -161,9 +174,9 @@
     <section class="workspace">
       <div class="toolbar">
         <div class="tool active" id="activePatternTool">Raahe 3+3 / Wedge / 4</div>
-        <div class="tool">Auto Optimize</div>
-        <div class="tool">Ship Library</div>
-        <div class="tool">Reports</div>
+        <div class="tool" id="autoOptimizeTool">Auto Optimize</div>
+        <div class="tool" id="shipLibraryTool">Ship Library</div>
+        <div class="tool" id="reportsTool">Reports</div>
         <div class="view-tabs">
           <button type="button" class="view-tab active" data-view="top">Top View</button>
           <button type="button" class="view-tab" data-view="section">Cross Section</button>
@@ -190,6 +203,10 @@
 
         <aside class="side-info">
           <section class="panel">
+            <div class="panel-title">Cargo Preview</div>
+            <div class="panel-body" id="cargoPreviewBox"><div class="details">Import cargo to preview coils.</div></div>
+          </section>
+          <section class="panel">
             <div class="panel-title">Summary</div>
             <div class="panel-body" id="summaryBox">
               <div class="details">Results will appear after calculation.</div>
@@ -213,6 +230,50 @@
       </div>
     </section>
   </main>
+
+
+  <div class="modalOverlay" id="shipModal">
+    <div class="modal">
+      <div class="modalHeader">
+        <h2>Ship Library</h2>
+        <button class="closeBtn" type="button" id="closeShipModal">Close</button>
+      </div>
+      <div class="modalBody">
+        <div class="shipList">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <b>Saved ships</b><button class="miniBtn" type="button" id="refreshShips">Refresh</button>
+          </div>
+          <div id="shipListBox" class="details">Loading...</div>
+        </div>
+        <div>
+          <div class="formGrid">
+            <div><label>Ship name</label><input id="libShipName" value="Default coaster"></div>
+            <div><label>Hold name</label><input id="libHoldName" value="Hold 1"></div>
+            <div><label>Hold length m</label><input id="libHoldLength" value="20.0" inputmode="decimal"></div>
+            <div><label>Hold width m</label><input id="libHoldWidth" value="11.5" inputmode="decimal"></div>
+            <div><label>Hold depth m</label><input id="libHoldDepth" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Max stack height m</label><input id="libMaxStack" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Tank top limit t/m²</label><input id="libTankTop" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Bilge radius m</label><input id="libBilge" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Hopper angle deg</label><input id="libHopper" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Hatch opening width m</label><input id="libHatch" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Frame spacing m</label><input id="libFrame" placeholder="optional" inputmode="decimal"></div>
+            <div><label>Default diameter m</label><input id="libDiameter" value="1.8" inputmode="decimal"></div>
+            <div><label>Row gap m</label><input id="libRowGap" value="0.15" inputmode="decimal"></div>
+            <div><label>Central gap m</label><input id="libCenterGap" value="0.70" inputmode="decimal"></div>
+          </div>
+          <div class="hint">This library saves ship/hold geometry in the app. Load a ship to fill Voyage Setup automatically.</div>
+          <div class="modalActions">
+            <button class="miniBtn blue" type="button" id="saveShipBtn">SAVE SHIP</button>
+            <button class="miniBtn" type="button" id="loadShipBtn">LOAD TO VOYAGE SETUP</button>
+            <button class="miniBtn" type="button" id="newShipBtn">NEW</button>
+            <button class="miniBtn red" type="button" id="deleteShipBtn">DELETE SELECTED</button>
+          </div>
+          <div class="hint" id="shipLibraryStatus"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <script>
 const form = document.getElementById('form');
@@ -244,6 +305,75 @@ const builderWedge = document.getElementById('builderWedge');
 const builderUpper = document.getElementById('builderUpper');
 const builderPattern = document.getElementById('builderPattern');
 const builderPreview = document.getElementById('builderPreview');
+const shipLibraryTool = document.getElementById('shipLibraryTool');
+const shipModal = document.getElementById('shipModal');
+const closeShipModal = document.getElementById('closeShipModal');
+const shipListBox = document.getElementById('shipListBox');
+const shipLibraryStatus = document.getElementById('shipLibraryStatus');
+let savedShips = [];
+let selectedShipFile = null;
+function numOrNull(v){ v = String(v || '').replace(',', '.').trim(); return v === '' ? null : Number(v); }
+function setVal(id, v){ document.getElementById(id).value = (v ?? ''); }
+function getShipFromLibraryForm(){
+  return {
+    ship_name: document.getElementById('libShipName').value || 'Unnamed ship',
+    hold_name: document.getElementById('libHoldName').value || 'Hold 1',
+    hold_length_m: numOrNull(document.getElementById('libHoldLength').value) || 0,
+    hold_width_m: numOrNull(document.getElementById('libHoldWidth').value) || 0,
+    hold_depth_m: numOrNull(document.getElementById('libHoldDepth').value),
+    max_stack_height_m: numOrNull(document.getElementById('libMaxStack').value),
+    tank_top_limit_t_m2: numOrNull(document.getElementById('libTankTop').value),
+    bilge_radius_m: numOrNull(document.getElementById('libBilge').value),
+    hopper_angle_deg: numOrNull(document.getElementById('libHopper').value),
+    hatch_opening_width_m: numOrNull(document.getElementById('libHatch').value),
+    frame_spacing_m: numOrNull(document.getElementById('libFrame').value),
+    coil_diameter_m: numOrNull(document.getElementById('libDiameter').value) || 1.8,
+    row_gap_m: numOrNull(document.getElementById('libRowGap').value) || 0.15,
+    center_gap_m: numOrNull(document.getElementById('libCenterGap').value) || 0.70,
+    stowage_pattern: stowagePattern.value
+  };
+}
+function fillLibraryForm(s){
+  setVal('libShipName', s.ship_name); setVal('libHoldName', s.hold_name); setVal('libHoldLength', s.hold_length_m); setVal('libHoldWidth', s.hold_width_m);
+  setVal('libHoldDepth', s.hold_depth_m); setVal('libMaxStack', s.max_stack_height_m); setVal('libTankTop', s.tank_top_limit_t_m2);
+  setVal('libBilge', s.bilge_radius_m); setVal('libHopper', s.hopper_angle_deg); setVal('libHatch', s.hatch_opening_width_m); setVal('libFrame', s.frame_spacing_m);
+  setVal('libDiameter', s.coil_diameter_m ?? 1.8); setVal('libRowGap', s.row_gap_m ?? 0.15); setVal('libCenterGap', s.center_gap_m ?? 0.70);
+}
+function applyShipToMainForm(s){
+  let shipSelect = document.getElementById('shipName');
+  if(![...shipSelect.options].some(o => o.value === s.ship_name || o.text === s.ship_name)){ shipSelect.add(new Option(s.ship_name, s.ship_name)); }
+  shipSelect.value = s.ship_name;
+  setVal('holdName', s.hold_name || 'Hold 1'); setVal('holdWidth', s.hold_width_m); setVal('holdLength', s.hold_length_m);
+  setVal('coilDiameter', s.coil_diameter_m ?? 1.8); setVal('rowGap', s.row_gap_m ?? 0.15); setVal('centerGap', s.center_gap_m ?? 0.70);
+  setVal('maxStackHeight', s.max_stack_height_m); setVal('tankTopLimit', s.tank_top_limit_t_m2);
+}
+async function refreshShipLibrary(){
+  shipListBox.innerHTML = 'Loading...';
+  const r = await fetch('/api/ships'); const data = await r.json(); savedShips = data.ships || [];
+  if(!savedShips.length){ shipListBox.innerHTML = '<div class="details">No saved ships yet.</div>'; return; }
+  shipListBox.innerHTML = savedShips.map((s,i)=>`<div class="shipItem ${s._file===selectedShipFile?'active':''}" data-i="${i}"><b>${s.ship_name || 'Unnamed ship'}</b><span>${s.hold_name || 'Hold'} · ${s.hold_length_m || '?'} m × ${s.hold_width_m || '?'} m</span></div>`).join('');
+  shipListBox.querySelectorAll('.shipItem').forEach(item => item.addEventListener('click', () => {
+    const s = savedShips[Number(item.dataset.i)]; selectedShipFile = s._file; fillLibraryForm(s);
+    shipListBox.querySelectorAll('.shipItem').forEach(x=>x.classList.remove('active')); item.classList.add('active');
+    shipLibraryStatus.textContent = `Selected: ${s.ship_name}`;
+  }));
+}
+shipLibraryTool.addEventListener('click', async () => { shipModal.style.display = 'flex'; fillLibraryForm({ship_name:document.getElementById('shipName').value, hold_name:document.getElementById('holdName').value, hold_length_m:numOrNull(document.getElementById('holdLength').value), hold_width_m:numOrNull(document.getElementById('holdWidth').value), coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value), row_gap_m:numOrNull(document.getElementById('rowGap').value), center_gap_m:numOrNull(document.getElementById('centerGap').value), max_stack_height_m:numOrNull(document.getElementById('maxStackHeight').value), tank_top_limit_t_m2:numOrNull(document.getElementById('tankTopLimit').value)}); await refreshShipLibrary(); });
+closeShipModal.addEventListener('click', () => shipModal.style.display = 'none');
+document.getElementById('refreshShips').addEventListener('click', refreshShipLibrary);
+document.getElementById('newShipBtn').addEventListener('click', () => { selectedShipFile = null; fillLibraryForm({ship_name:'New ship', hold_name:'Hold 1', hold_length_m:20, hold_width_m:11.5, coil_diameter_m:1.8, row_gap_m:0.15, center_gap_m:0.70}); shipLibraryStatus.textContent='New ship template.'; });
+document.getElementById('saveShipBtn').addEventListener('click', async () => {
+  const ship = getShipFromLibraryForm();
+  const r = await fetch('/api/ships', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(ship)});
+  const data = await r.json(); if(!r.ok){ shipLibraryStatus.textContent = data.detail || 'Save failed'; return; }
+  selectedShipFile = data.file; shipLibraryStatus.textContent = `Saved: ${ship.ship_name}`; await refreshShipLibrary();
+});
+document.getElementById('loadShipBtn').addEventListener('click', () => { const ship = getShipFromLibraryForm(); applyShipToMainForm(ship); shipModal.style.display = 'none'; });
+document.getElementById('deleteShipBtn').addEventListener('click', async () => {
+  if(!selectedShipFile){ shipLibraryStatus.textContent = 'Select a ship first.'; return; }
+  const r = await fetch('/api/ships/' + encodeURIComponent(selectedShipFile), {method:'DELETE'}); const data = await r.json();
+  shipLibraryStatus.textContent = r.ok ? `Deleted: ${selectedShipFile}` : (data.detail || 'Delete failed'); selectedShipFile = null; await refreshShipLibrary();
+});
 function buildPatternText(){
   const p = parseInt(builderPort.value || '0', 10);
   const s = parseInt(builderStbd.value || '0', 10);
@@ -272,6 +402,8 @@ customPattern.addEventListener('input', updatePatternUI);
 [builderPort,builderStbd,builderWedge,builderUpper].forEach(el => el.addEventListener('input', updatePatternUI));
 [builderWedge].forEach(el => el.addEventListener('change', updatePatternUI));
 updatePatternUI();
+document.getElementById('autoOptimizeTool').addEventListener('click', () => alert('Auto Optimize will be implemented after the geometry engine is tested.'));
+document.getElementById('reportsTool').addEventListener('click', () => alert('Reports will be implemented after generated plans are tested.'));
 document.getElementById('cargoFile').addEventListener('change', e => {
   uploadState.textContent = e.target.files[0] ? e.target.files[0].name : 'No file';
 });
