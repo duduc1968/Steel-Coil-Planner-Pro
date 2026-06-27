@@ -142,14 +142,34 @@ def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, 
             n = int(low)
             base = support_y or last_y
             # If possible, upper rows sit in the valleys between the lower row.
-            # Example: 3+3 / Wedge / 4 => the 4 upper coils sit between the 6 bottom coils,
-            # two on port side and two on starboard side, while the wedge is also tier 2.
+            # When a wedge/center exists, upper coils must be distributed around it:
+            #   2 => 1 port + 1 starboard
+            #   3 => 2 port + 1 starboard
+            #   4 => 2 port + 2 starboard
+            # and so on. Each selected upper coil sits between two bottom coils.
             if level > 0 and len(base) >= 2 and n <= len(base) - 1:
                 gaps = [(base[i+1] - base[i], (base[i] + base[i+1]) / 2) for i in range(len(base)-1)]
                 valid = [(dist, mid) for dist, mid in gaps if dist <= D * 1.35]
                 if len(valid) >= n:
-                    # Prefer real touching/near-touching gaps and keep port-to-starboard order.
-                    ys = [mid for _, mid in valid[:n]]
+                    wedge_positions = [p for p in positions if p[0] in ("Wedge", "Center")]
+                    if wedge_positions:
+                        wedge_y = float(wedge_positions[-1][2])
+                        left = [mid for _, mid in valid if mid < wedge_y]
+                        right = [mid for _, mid in valid if mid > wedge_y]
+                        left_n = (n + 1) // 2
+                        right_n = n // 2
+                        # Select valleys closest to the wedge on each side, then draw port-to-starboard.
+                        chosen_left = sorted(sorted(left, key=lambda y: abs(y - wedge_y))[:left_n])
+                        chosen_right = sorted(sorted(right, key=lambda y: abs(y - wedge_y))[:right_n])
+                        ys = chosen_left + chosen_right
+                        # Fallback if one side has too few valleys.
+                        if len(ys) < n:
+                            chosen = set(ys)
+                            extras = [mid for _, mid in sorted(valid, key=lambda dm: abs(dm[1] - wedge_y)) if mid not in chosen]
+                            ys = sorted(ys + extras[:n-len(ys)])
+                    else:
+                        # No wedge: keep normal port-to-starboard valley order.
+                        ys = [mid for _, mid in valid[:n]]
                 else:
                     ys = _row_centers(n, W, D)
             else:
