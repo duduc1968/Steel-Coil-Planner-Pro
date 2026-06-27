@@ -33,6 +33,10 @@ def make_plan(cargo_df: pd.DataFrame, cfg: dict):
         planning_diameter = float(cargo["Diameter_m"].max())
     else:
         planning_diameter = float(cfg["coil_diameter_m"])
+        cargo["Diameter_m"] = planning_diameter
+
+    # v4.0 planning rule: use largest diameter for safe geometry and load heavier/wider coils first.
+    cargo = cargo.sort_values(["Diameter_m", "Weight_t", "Width_m"], ascending=[False, False, False]).reset_index(drop=True)
 
     cfg["planning_diameter_m"] = planning_diameter
     positions = positions_for_pattern(cfg.get("stowage_pattern"), cfg["hold_width_m"], planning_diameter, cfg.get("center_gap_m"), cfg.get("effective_custom_pattern", cfg.get("custom_pattern")))
@@ -62,8 +66,7 @@ def make_plan(cargo_df: pd.DataFrame, cfg: dict):
                 "y_m": y,
                 "z_m": z,
             }
-            if "Diameter_m" in coil:
-                row["Diameter_m"] = float(coil["Diameter_m"])
+            row["Diameter_m"] = float(coil.get("Diameter_m", planning_diameter))
             rows.append(row)
 
         x += block_len + float(cfg["row_gap_m"])

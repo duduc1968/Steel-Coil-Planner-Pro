@@ -1,11 +1,16 @@
-# Steel Coil Planner Pro v3.2 Beta - Geometry Engine
+# Steel Coil Planner Pro v4.0 Beta – Planning Engine
 
-New in v3.2:
-- Generate Layout button
-- same coil coordinates drive Top View, Cross Section and 3D View
-- Top View now shows coils as longitudinal cylinders, not plain rectangles
-- coil colors by weight: <16t, 16-22t, 22-28t, >28t
-- click any coil to inspect ID, weight, width, diameter, X/Y/Z and tier
-- utilization percentage added to Summary
+This version starts the real planning engine phase.
 
-Cargo columns: ID, Width, Weight, optional Diameter. Values are auto-converted to m and tonnes.
+## New in v4.0
+- Import Cargo button: reads CSV/Excel/PDF before planning.
+- Cargo preview with English terminology: ID, Weight (t), Width (m), Diameter (m).
+- Automatic unit conversion: mm → m, kg → tonnes.
+- Planning engine sorts coils by Diameter, Weight and Width before layout.
+- Generate Plan draws Top View, Cross Section and 3D beta from the same calculated coil coordinates.
+
+## Cargo columns
+Required: ID, Width, Weight  
+Optional: Diameter
+
+Values may be in mm/kg or m/tonnes; the app converts them automatically.

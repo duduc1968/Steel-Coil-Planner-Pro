@@ -28,6 +28,47 @@ app.mount("/results", StaticFiles(directory=RESULTS), name="results")
 def to_float(value: str):
     return float(str(value).replace(",", "."))
 
+@app.post("/import-cargo")
+async def import_cargo(cargo_file: UploadFile = File(...)):
+    """Read cargo only, normalize units, and return a preview before planning."""
+    try:
+        suffix = Path(cargo_file.filename).suffix.lower()
+        if suffix not in [".csv", ".xlsx", ".xls", ".pdf"]:
+            raise HTTPException(status_code=400, detail="Please upload CSV/XLSX/PDF file.")
+        job_id = uuid4().hex[:10]
+        upload_path = UPLOADS / f"preview_{job_id}{suffix}"
+        upload_path.write_bytes(await cargo_file.read())
+        cargo = read_cargo(upload_path)
+
+        # Same unit conversion logic as planner, for preview only.
+        import pandas as pd
+        def series_to_m(values):
+            x = pd.to_numeric(values, errors="raise")
+            return x.where(x <= 20, x / 1000)
+        def series_to_t(values):
+            x = pd.to_numeric(values, errors="raise")
+            return x.where(x <= 200, x / 1000)
+
+        cargo = cargo.copy()
+        cargo["Width_m"] = series_to_m(cargo["Width"])
+        cargo["Weight_t"] = series_to_t(cargo["Weight"])
+        if "Diameter" in cargo.columns and cargo["Diameter"].notna().any():
+            cargo["Diameter_m"] = series_to_m(cargo["Diameter"])
+        cargo = cargo.sort_values([c for c in ["Diameter_m", "Weight_t", "Width_m"] if c in cargo.columns], ascending=False).reset_index(drop=True)
+        rows = cargo[[c for c in ["ID", "Width_m", "Weight_t", "Diameter_m"] if c in cargo.columns]].head(200).to_dict("records")
+        return {
+            "filename": cargo_file.filename,
+            "coil_count": int(len(cargo)),
+            "total_weight_t": float(cargo["Weight_t"].sum()),
+            "max_width_m": float(cargo["Width_m"].max()),
+            "max_diameter_m": float(cargo["Diameter_m"].max()) if "Diameter_m" in cargo.columns else None,
+            "coils": rows,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/calculate")
 async def calculate(
     ship_name: str = Form(...),

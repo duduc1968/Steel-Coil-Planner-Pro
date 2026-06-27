@@ -79,7 +79,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v3.2 beta · Geometry Engine View</div>
+    <div class="version">v4.0 beta · Planning Engine</div>
   </header>
 
   <main class="app">
@@ -146,7 +146,8 @@
           <label>Cargo list</label>
           <input id="cargoFile" type="file" name="cargo_file" accept=".csv,.xlsx,.xls,.pdf" required>
 
-          <button class="btn" id="btn" type="submit">GENERATE LAYOUT</button>
+          <button class="btn" id="importBtn" type="button">IMPORT CARGO</button>
+          <button class="btn" id="btn" type="submit">GENERATE PLAN</button>
         </form>
         <div class="hint">Accepted: CSV, Excel, PDF. Use English columns: ID, Width, Weight, optional Diameter. Values are auto-converted to m and tonnes (mm/kg or m/t).</div>
       </div>
@@ -169,7 +170,7 @@
         <section class="panel">
           <div class="panel-title" id="planTitle">Hold Plan – Top View</div>
           <div class="plan-wrap">
-            <div id="emptyPlan" class="empty">No plan calculated yet<br>Upload cargo and press Calculate</div>
+            <div id="emptyPlan" class="empty">No plan calculated yet<br>Upload cargo and press Generate Plan</div>
             <svg id="planSvg" viewBox="0 0 1000 600" style="display:none"></svg>
             <svg id="sectionSvg" class="view-canvas sectionCanvas" viewBox="0 0 1000 600"></svg>
             <svg id="threeDSvg" class="view-canvas threeDCanvas" viewBox="0 0 1000 600"></svg>
@@ -211,6 +212,8 @@
 <script>
 const form = document.getElementById('form');
 const btn = document.getElementById('btn');
+const importBtn = document.getElementById('importBtn');
+const cargoPreviewBox = document.getElementById('cargoPreviewBox');
 const summaryBox = document.getElementById('summaryBox');
 const weightsBox = document.getElementById('weightsBox');
 const svg = document.getElementById('planSvg');
@@ -458,10 +461,38 @@ function drawInteractivePlan(data){
   if(currentView === '3d') selectView('3d');
 }
 
+
+importBtn.addEventListener('click', async () => {
+  const file = document.getElementById('cargoFile').files[0];
+  if(!file){ cargoPreviewBox.innerHTML = '<div class="details"><b>Error:</b><br>Please choose a cargo file first.</div>'; return; }
+  importBtn.disabled = true;
+  importBtn.textContent = 'IMPORTING...';
+  cargoPreviewBox.innerHTML = '<div class="details">Reading cargo and converting units...</div>';
+  try{
+    const fd = new FormData();
+    fd.append('cargo_file', file);
+    const response = await fetch('/import-cargo', {method:'POST', body:fd});
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.detail || 'Import failed');
+    const rows = (data.coils || []).slice(0, 20).map(c => `
+      <tr><td>${c.ID}</td><td>${Number(c.Weight_t).toFixed(1)}</td><td>${Number(c.Width_m).toFixed(2)}</td><td>${c.Diameter_m ? Number(c.Diameter_m).toFixed(2) : '-'}</td></tr>
+    `).join('');
+    cargoPreviewBox.innerHTML = `
+      <div class="details"><b>${data.filename}</b><br>${data.coil_count} coils · ${data.total_weight_t.toFixed(1)} t<br>Max width ${data.max_width_m.toFixed(2)} m${data.max_diameter_m ? ` · Max diameter ${data.max_diameter_m.toFixed(2)} m` : ''}</div>
+      <table><thead><tr><th>ID</th><th>Weight t</th><th>Width m</th><th>Diam. m</th></tr></thead><tbody>${rows}</tbody></table>
+    `;
+  }catch(err){
+    cargoPreviewBox.innerHTML = `<div class="details"><b>Error:</b><br>${err.message}</div>`;
+  }finally{
+    importBtn.disabled = false;
+    importBtn.textContent = 'IMPORT CARGO';
+  }
+});
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   btn.disabled = true;
-  btn.textContent = 'GENERATING...';
+  btn.textContent = 'GENERATING PLAN...';
   summaryBox.innerHTML = '<div class="details">Working...</div>';
   weightsBox.innerHTML = '<div class="details">Working...</div>';
 
@@ -502,7 +533,7 @@ form.addEventListener('submit', async (e) => {
     summaryBox.innerHTML = `<div class="details"><b>Error:</b><br>${err.message}</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'GENERATE LAYOUT';
+    btn.textContent = 'GENERATE PLAN';
   }
 });
 
