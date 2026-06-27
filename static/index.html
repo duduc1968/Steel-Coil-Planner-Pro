@@ -92,7 +92,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v4.3 beta · View Refinement Test Build</div>
+    <div class="version">v4.4 beta · Final View Refinement</div>
   </header>
 
   <main class="app">
@@ -567,7 +567,7 @@ function drawInteractivePlan(data){
     const y = pad + c.y_m * scaleY;
     const w = Math.max(c.Width_m * scaleX, 14);
     const d = Number(c.Diameter_m) || hold.diameter_m || 1.8;
-    const h = Math.min(Math.max(d * scaleY * 0.32, 18), 42);
+    const h = Math.min(Math.max(d * scaleY * 0.18, 14), 28);
     const color = coilColor(c);
     const g = el('g', {style:'cursor:pointer'});
     const body = document.createElementNS(ns,'rect');
@@ -588,7 +588,7 @@ function drawInteractivePlan(data){
   });
 
   const key = el('text', {x:pad+10, y:H-18, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
-  key.textContent = 'Color by tier: green = Tier 1 (bottom) · yellow = wedge · blue = Tier 2 (upper). Coils are stowed longitudinally.';
+  key.textContent = 'Top View: longitudinal stowage blocks as originally designed. Colors are only subtle tier identification.';
 
   lastPlanData = data;
   emptyPlan.style.display = 'none';
