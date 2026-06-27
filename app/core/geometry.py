@@ -7,6 +7,7 @@ PATTERN_LABELS = {
     "simple_5_5": "Simple 5+5",
     "three_center_three": "3 + Center + 3",
     "four_center_four": "4 + Center + 4",
+    "custom": "Custom / Manual",
 }
 
 def _check_width(required, W, name):
@@ -88,7 +89,62 @@ def split_with_center_positions(side_n, W, D, gap, name):
     positions.append(("Center", "C1", center_y, z_center))
     return positions
 
-def positions_for_pattern(pattern: str, hold_width_m: float, diameter_m: float, center_gap_m: float | None = None):
+
+def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, center_gap_m: float | None = None):
+    """Manual pattern parser.
+    Syntax: tiers from bottom upwards separated by /, e.g.
+    '3+3 / Wedge / 4', '6 / 5 / 4', '4+4 / Center / 3'.
+    Number = centered row with that many coils. A+B = split row with central gap.
+    Wedge/Center = one centered coil.
+    """
+    W = float(hold_width_m); D = float(diameter_m); r = D / 2
+    gap = 0.70 if center_gap_m in [None, ""] else float(center_gap_m)
+    text = (pattern_text or "").strip()
+    if not text:
+        raise ValueError("Custom row arrangement is empty. Example: 3+3 / Wedge / 4")
+    tiers = [t.strip() for t in text.replace('\\', '/').split('/') if t.strip()]
+    if not tiers:
+        raise ValueError("Custom row arrangement is empty. Example: 3+3 / Wedge / 4")
+    positions = []
+    z0 = r + 0.20
+    z_step = math.sqrt(max(D**2 - (D / 2)**2, 0))
+    last_y = []
+    for level, token in enumerate(tiers):
+        low = token.lower().replace(' ', '')
+        z = z0 + level * z_step
+        if low in ["wedge", "center", "centre", "c", "w"]:
+            y = W / 2
+            if len(last_y) >= 2:
+                left = max([v for v in last_y if v <= y], default=None)
+                right = min([v for v in last_y if v >= y], default=None)
+                if left is not None and right is not None and right > left:
+                    dx = (right - left) / 2
+                    if dx < D:
+                        z = (z0 + (level-1)*z_step) + math.sqrt(max(D**2 - dx**2, 0))
+            tier_name = "Wedge" if low.startswith('w') else "Center"
+            positions.append((tier_name, f"{tier_name[0]}1", y, z))
+            last_y = [y]
+            continue
+        if '+' in low:
+            parts = low.split('+')
+            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                left_n, right_n = int(parts[0]), int(parts[1])
+                left, right = _split_centers(left_n, right_n, W, D, gap)
+                ys = left + right
+            else:
+                raise ValueError(f"Cannot read custom tier '{token}'. Use e.g. 3+3, 6, Wedge, Center.")
+        elif low.isdigit():
+            ys = _row_centers(int(low), W, D)
+        else:
+            raise ValueError(f"Cannot read custom tier '{token}'. Use e.g. 3+3, 6, Wedge, Center.")
+        tier_name = "Bottom" if level == 0 else "Upper"
+        prefix = "B" if level == 0 else f"U{level}-"
+        for i, y in enumerate(ys):
+            positions.append((tier_name, f"{prefix}{i+1}", y, z))
+        last_y = ys
+    return positions
+
+def positions_for_pattern(pattern: str, hold_width_m: float, diameter_m: float, center_gap_m: float | None = None, custom_pattern: str | None = None):
     pattern = pattern or "raahe_3_3_wedge_4"
     W = float(hold_width_m); D = float(diameter_m)
     gap = 0.70 if center_gap_m in [None, ""] else float(center_gap_m)
@@ -104,4 +160,6 @@ def positions_for_pattern(pattern: str, hold_width_m: float, diameter_m: float, 
         return split_with_center_positions(3, W, D, gap, "3 + Center + 3")
     if pattern == "four_center_four":
         return split_with_center_positions(4, W, D, gap, "4 + Center + 4")
+    if pattern == "custom":
+        return custom_positions(custom_pattern or "", W, D, gap)
     raise ValueError(f"Unknown row arrangement: {pattern}")

@@ -85,3 +85,15 @@ CSV sau Excel cu coloanele:
   - Width/Diameter: values above 20 are treated as mm and converted to m. Values 20 or below are treated as m.
   - Weight: values above 200 are treated as kg and converted to tonnes. Values 200 or below are treated as tonnes.
 - If a Diameter column is present in the cargo list, the planner uses the largest cargo diameter for the row geometry. Otherwise it uses the manual Diameter m field.
+
+
+## v2.2 Custom Row Arrangement
+
+The Row Arrangement field now includes **Custom / Manual**.
+Use `/` for tiers from bottom upwards:
+
+- `3+3 / Wedge / 4`
+- `6 / 5 / 4`
+- `4+4 / Center / 3`
+
+A number means a centered row. `A+B` means a split row with the central gap. `Wedge`, `Center`, or `Centre` means one centered coil above the previous tier.

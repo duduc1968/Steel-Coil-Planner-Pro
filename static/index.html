@@ -109,7 +109,14 @@
             <option value="simple_5_5">Simple 5+5</option>
             <option value="three_center_three">3 + Center + 3</option>
             <option value="four_center_four">4 + Center + 4</option>
+            <option value="custom">Custom / Manual</option>
           </select>
+
+          <div id="customPatternBox" style="display:none">
+            <label>Custom row arrangement</label>
+            <input name="custom_pattern" id="customPattern" value="3+3 / Wedge / 4" placeholder="Example: 3+3 / Wedge / 4 or 6 / 5 / 4">
+            <div class="hint" style="margin-top:6px">Use / for tiers from bottom upwards. Examples: 3+3 / Wedge / 4, 6 / 5 / 4, 4+4 / Center / 3.</div>
+          </div>
 
           <label>Central gap m</label>
           <input name="center_gap_m" value="0.70" inputmode="decimal">
@@ -183,7 +190,16 @@ const coilDetails = document.getElementById('coilDetails');
 const uploadState = document.getElementById('uploadState');
 const stowagePattern = document.getElementById('stowagePattern');
 const activePatternTool = document.getElementById('activePatternTool');
-stowagePattern.addEventListener('change', () => { activePatternTool.textContent = stowagePattern.options[stowagePattern.selectedIndex].text; });
+const customPatternBox = document.getElementById('customPatternBox');
+const customPattern = document.getElementById('customPattern');
+function updatePatternUI(){
+  const isCustom = stowagePattern.value === 'custom';
+  customPatternBox.style.display = isCustom ? 'block' : 'none';
+  activePatternTool.textContent = isCustom ? (customPattern.value || 'Custom / Manual') : stowagePattern.options[stowagePattern.selectedIndex].text;
+}
+stowagePattern.addEventListener('change', updatePatternUI);
+customPattern.addEventListener('input', updatePatternUI);
+updatePatternUI();
 document.getElementById('cargoFile').addEventListener('change', e => {
   uploadState.textContent = e.target.files[0] ? e.target.files[0].name : 'No file';
 });

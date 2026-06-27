@@ -38,6 +38,7 @@ async def calculate(
     row_gap_m: str = Form(...),
     center_gap_m: str = Form("0.70"),
     stowage_pattern: str = Form("raahe_3_3_wedge_4"),
+    custom_pattern: str = Form(""),
     cargo_file: UploadFile = File(...),
 ):
     try:
@@ -61,7 +62,8 @@ async def calculate(
             "row_gap_m": to_float(row_gap_m),
             "center_gap_m": to_float(center_gap_m),
             "stowage_pattern": stowage_pattern,
-            "stowage_pattern_label": PATTERN_LABELS.get(stowage_pattern, stowage_pattern),
+            "custom_pattern": custom_pattern,
+            "stowage_pattern_label": custom_pattern if stowage_pattern == "custom" and custom_pattern.strip() else PATTERN_LABELS.get(stowage_pattern, stowage_pattern),
         }
 
         cargo = read_cargo(upload_path)
