@@ -76,3 +76,12 @@ CSV sau Excel cu coloanele:
 - Click a coil to inspect ID / tier / weight / coordinates
 - Server returns coil coordinate data as JSON
 - Workspace-style layout
+
+
+## v2.1 updates
+- Row Arrangement selector added: Raahe 3+3 / Wedge / 4, Simple 3+3, Simple 4+4, Simple 5+5, 3 + Center + 3, 4 + Center + 4.
+- Cargo list terminology normalized to English: ID, Width, Weight, optional Diameter.
+- Automatic unit conversion:
+  - Width/Diameter: values above 20 are treated as mm and converted to m. Values 20 or below are treated as m.
+  - Weight: values above 200 are treated as kg and converted to tonnes. Values 200 or below are treated as tonnes.
+- If a Diameter column is present in the cargo list, the planner uses the largest cargo diameter for the row geometry. Otherwise it uses the manual Diameter m field.

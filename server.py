@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.io.cargo_reader import read_cargo
 from app.core.planner import make_plan, summary
+from app.core.geometry import PATTERN_LABELS
 from app.reports.drawing import draw_plan
 from app.reports.weight_report import block_weight_summary
 
@@ -36,6 +37,7 @@ async def calculate(
     coil_diameter_m: str = Form(...),
     row_gap_m: str = Form(...),
     center_gap_m: str = Form("0.70"),
+    stowage_pattern: str = Form("raahe_3_3_wedge_4"),
     cargo_file: UploadFile = File(...),
 ):
     try:
@@ -58,7 +60,8 @@ async def calculate(
             "coil_diameter_m": to_float(coil_diameter_m),
             "row_gap_m": to_float(row_gap_m),
             "center_gap_m": to_float(center_gap_m),
-            "stowage_pattern": "raahe_3_gap_3_wedge_4"
+            "stowage_pattern": stowage_pattern,
+            "stowage_pattern_label": PATTERN_LABELS.get(stowage_pattern, stowage_pattern),
         }
 
         cargo = read_cargo(upload_path)
@@ -73,7 +76,7 @@ async def calculate(
             "hold": {
                 "width_m": cfg["hold_width_m"],
                 "length_m": cfg["hold_length_m"],
-                "diameter_m": cfg["coil_diameter_m"],
+                "diameter_m": cfg.get("planning_diameter_m", cfg["coil_diameter_m"]),
                 "row_gap_m": cfg["row_gap_m"],
                 "center_gap_m": cfg.get("center_gap_m", 0.0),
             },

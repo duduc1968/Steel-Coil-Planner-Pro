@@ -10,7 +10,7 @@ def draw_plan(plan, positions, cfg, output_dir):
 
     hold_w = float(cfg["hold_width_m"])
     hold_l = float(cfg["hold_length_m"])
-    D = float(cfg["coil_diameter_m"])
+    D = float(cfg.get("planning_diameter_m", cfg["coil_diameter_m"]))
     r = D / 2
 
     used_len = float(plan["block_x1_m"].max()) if len(plan) else 0.0
@@ -24,7 +24,7 @@ def draw_plan(plan, positions, cfg, output_dir):
     ax.set_title(f"Cross section – Ø {D:.2f} m", fontsize=13, weight="bold")
     ax.add_patch(Rectangle((0, 0), hold_w, 5.9, fill=False, lw=2))
     for tier, pos, y, z in positions:
-        hatch = "//" if tier in ["SUS", "PANA"] else None
+        hatch = "//" if tier in ["Upper", "Wedge", "Center"] else None
         ax.add_patch(Circle((y, z), r, fill=False, lw=2, hatch=hatch))
         ax.text(y, z, pos, ha="center", va="center", fontsize=10)
     ax.text(hold_w / 2, -0.35, f"Hold width {hold_w:.2f} m", ha="center", weight="bold")
@@ -34,19 +34,19 @@ def draw_plan(plan, positions, cfg, output_dir):
     ax.axis("off")
 
     ax2 = fig.add_subplot(gs[1, :])
-    ax2.set_title("Top view – each coil shown with its own Bredd/length", fontsize=13, weight="bold")
+    ax2.set_title("Top view – each coil shown with its own width", fontsize=13, weight="bold")
     ax2.add_patch(Rectangle((0, 0), hold_l, hold_w, fill=False, lw=2))
     for _, row in plan.iterrows():
         h = 0.42
-        hatch = "//" if row["Tier"] in ["SUS", "PANA"] else None
-        ax2.add_patch(Rectangle((row["x0_m"], row["y_m"] - h/2), row["Length_m"], h, fill=False, lw=1.4, hatch=hatch))
-        ax2.text(row["x0_m"] + row["Length_m"]/2, row["y_m"], row["Position"], ha="center", va="center", fontsize=8)
+        hatch = "//" if row["Tier"] in ["Upper", "Wedge", "Center"] else None
+        ax2.add_patch(Rectangle((row["x0_m"], row["y_m"] - h/2), row["Width_m"], h, fill=False, lw=1.4, hatch=hatch))
+        ax2.text(row["x0_m"] + row["Width_m"]/2, row["y_m"], row["Position"], ha="center", va="center", fontsize=8)
 
     for block, group in plan.groupby("Block"):
         ax2.axvline(group["block_x0_m"].min(), ls="--", lw=0.8)
         ax2.text((group["block_x0_m"].min() + group["block_x1_m"].max()) / 2,
                  hold_w + 0.15,
-                 f"Block {block}\\nmax {group['Length_m'].max():.2f} m",
+                 f"Block {block}\\nmax {group['Width_m'].max():.2f} m",
                  ha="center",
                  fontsize=9)
 
@@ -67,6 +67,7 @@ def draw_plan(plan, positions, cfg, output_dir):
         ("Total weight", f"{total_t:.1f} t"),
         ("Diameter", f"{D:.2f} m"),
         ("Row gap", f"{float(cfg['row_gap_m']):.2f} m"),
+        ("Pattern", cfg.get("stowage_pattern_label", cfg.get("stowage_pattern", ""))),
         ("Central gap", f"{float(cfg.get('center_gap_m', 0.0)):.2f} m"),
         ("Used length", f"{used_len:.2f} m"),
         ("Free length", f"{free_len:.2f} m"),

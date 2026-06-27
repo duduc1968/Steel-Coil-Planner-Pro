@@ -72,7 +72,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v2.0 · Interactive 2D Plan</div>
+    <div class="version">v2.1 · Row Arrangement + Flexible Cargo Units</div>
   </header>
 
   <main class="app">
@@ -97,11 +97,21 @@
           </div>
 
           <div class="two">
-            <div><label>Coil Ø m</label><input name="coil_diameter_m" value="1.8" inputmode="decimal"></div>
+            <div><label>Diameter m</label><input name="coil_diameter_m" value="1.8" inputmode="decimal"></div>
             <div><label>Row gap m</label><input name="row_gap_m" value="0.15" inputmode="decimal"></div>
           </div>
 
-          <label>Central gap 3+3 m</label>
+          <label>Row Arrangement</label>
+          <select name="stowage_pattern" id="stowagePattern">
+            <option value="raahe_3_3_wedge_4">Raahe 3+3 / Wedge / 4</option>
+            <option value="simple_3_3">Simple 3+3</option>
+            <option value="simple_4_4">Simple 4+4</option>
+            <option value="simple_5_5">Simple 5+5</option>
+            <option value="three_center_three">3 + Center + 3</option>
+            <option value="four_center_four">4 + Center + 4</option>
+          </select>
+
+          <label>Central gap m</label>
           <input name="center_gap_m" value="0.70" inputmode="decimal">
 
           <label>Cargo list</label>
@@ -109,13 +119,13 @@
 
           <button class="btn" id="btn" type="submit">CALCULATE</button>
         </form>
-        <div class="hint">Accepted: CSV, Excel, PDF. PDF must contain selectable text/table data.</div>
+        <div class="hint">Accepted: CSV, Excel, PDF. Use English columns: ID, Width, Weight, optional Diameter. Values are auto-converted to m and tonnes (mm/kg or m/t).</div>
       </div>
     </aside>
 
     <section class="workspace">
       <div class="toolbar">
-        <div class="tool active">Raahe 3+3 / Wedge / 4</div>
+        <div class="tool active" id="activePatternTool">Raahe 3+3 / Wedge / 4</div>
         <div class="tool">Auto Optimize</div>
         <div class="tool">Ship Library</div>
         <div class="tool">Reports</div>
@@ -171,13 +181,17 @@ const emptyPlan = document.getElementById('emptyPlan');
 const legend = document.getElementById('legend');
 const coilDetails = document.getElementById('coilDetails');
 const uploadState = document.getElementById('uploadState');
+const stowagePattern = document.getElementById('stowagePattern');
+const activePatternTool = document.getElementById('activePatternTool');
+stowagePattern.addEventListener('change', () => { activePatternTool.textContent = stowagePattern.options[stowagePattern.selectedIndex].text; });
 document.getElementById('cargoFile').addEventListener('change', e => {
   uploadState.textContent = e.target.files[0] ? e.target.files[0].name : 'No file';
 });
 
 function tierColor(tier){
-  if(tier === 'JOS') return '#1d4ed8';
-  if(tier === 'PANA') return '#f59e0b';
+  if(tier === 'Bottom') return '#1d4ed8';
+  if(tier === 'Wedge') return '#f59e0b';
+  if(tier === 'Center') return '#7c3aed';
   return '#059669';
 }
 
@@ -218,7 +232,7 @@ function drawInteractivePlan(data){
   coils.forEach(c => {
     const x = pad + c.x0_m * scaleX;
     const y = pad + c.y_m * scaleY;
-    const w = Math.max(c.Length_m * scaleX, 10);
+    const w = Math.max(c.Width_m * scaleX, 10);
     const h = 16;
     const rect = el('rect', {
       x:x, y:y-h/2, width:w, height:h, rx:3,
@@ -229,8 +243,9 @@ function drawInteractivePlan(data){
       coilDetails.innerHTML = `
         <b>ID:</b> ${c.ID}<br>
         <b>Block:</b> ${c.Block} · <b>Position:</b> ${c.Position} · <b>Tier:</b> ${c.Tier}<br>
-        <b>Length:</b> ${Number(c.Length_m).toFixed(3)} m<br>
+        <b>Width:</b> ${Number(c.Width_m).toFixed(3)} m<br>
         <b>Weight:</b> ${Number(c.Weight_t).toFixed(3)} t<br>
+        ${c.Diameter_m ? `<b>Diameter:</b> ${Number(c.Diameter_m).toFixed(3)} m<br>` : ``}
         <b>X:</b> ${Number(c.x0_m).toFixed(2)}–${Number(c.x1_m).toFixed(2)} m · <b>Y:</b> ${Number(c.y_m).toFixed(2)} m
       `;
     });
@@ -263,11 +278,11 @@ form.addEventListener('submit', async (e) => {
     summaryBox.innerHTML = `
       <div class="stats">
         <div class="stat"><b>Coils</b><span>${data.coil_count}</span></div>
-        <div class="stat"><b>Total</b><span>${data.total_weight_t.toFixed(1)} t</span></div>
+        <div class="stat"><b>Total weight</b><span>${data.total_weight_t.toFixed(1)} t</span></div>
         <div class="stat"><b>Used</b><span>${data.used_length_m.toFixed(2)} m</span></div>
         <div class="stat"><b>Free</b><span>${data.free_length_m.toFixed(2)} m</span></div>
       </div>
-      <div class="details"><b>Status:</b> <span class="${data.status === 'OK' ? 'ok':'bad'}">${data.status}</span></div>
+      <div class="details"><b>Pattern:</b> ${data.stowage_pattern_label}<br><b>Planning diameter:</b> ${data.planning_diameter_m.toFixed(2)} m<br><b>Status:</b> <span class="${data.status === 'OK' ? 'ok':'bad'}">${data.status}</span></div>
       <div class="links">
         <a href="${data.png_url}" target="_blank">PNG</a>
         <a href="${data.pdf_url}" target="_blank">PDF</a>
@@ -276,11 +291,11 @@ form.addEventListener('submit', async (e) => {
     `;
 
     const rows = (data.block_weights || []).map(r => `
-      <tr><td>${r.Block}</td><td>${Number(r.Bottom_t).toFixed(1)}</td><td>${Number(r.Wedge_t).toFixed(1)}</td><td>${Number(r.Upper_t).toFixed(1)}</td><td><b>${Number(r.Total_t).toFixed(1)}</b></td></tr>
+      <tr><td>${r.Block}</td><td>${Number(r.Bottom_t).toFixed(1)}</td><td>${Number(r.Wedge_t || 0).toFixed(1)}</td><td>${Number(r.Center_t || 0).toFixed(1)}</td><td>${Number(r.Upper_t || 0).toFixed(1)}</td><td><b>${Number(r.Total_t).toFixed(1)}</b></td></tr>
     `).join('');
     weightsBox.innerHTML = `
       <table>
-        <thead><tr><th>Block</th><th>Bottom</th><th>Wedge</th><th>Upper</th><th>Total</th></tr></thead>
+        <thead><tr><th>Block</th><th>Bottom</th><th>Wedge</th><th>Center</th><th>Upper</th><th>Total</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
