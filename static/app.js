@@ -44,7 +44,7 @@ let lastCargoPreview = null;
 
 // v5.2: keep the Fleet Library in the browser as well as on the server.
 // This prevents saved ship/hold data from being lost or reloaded with defaults after deploy/cache refresh.
-const FLEET_KEY = 'scp_fleet_library_v52';
+const FLEET_KEY = 'scp_fleet_library_v71';
 function clone(obj){ return JSON.parse(JSON.stringify(obj || {})); }
 function localFleet(){
   try { return JSON.parse(localStorage.getItem(FLEET_KEY) || '[]'); }
@@ -363,9 +363,11 @@ function estimatePatternCapacity(){
   return bottom + upper + wedgeCount;
 }
 function allocationBase(){
-  const totalCoils = Number((lastCargoPreview && lastCargoPreview.coil_count) || (lastPlanData && lastPlanData.coil_count) || 0);
-  const totalWeight = Number((lastCargoPreview && lastCargoPreview.total_weight_t) || (lastPlanData && lastPlanData.total_weight_t) || 0);
-  const avgW = Number((lastCargoPreview && (lastCargoPreview.avg_width_m || lastCargoPreview.max_width_m)) || 0);
+  const coilsFromPlan = (lastPlanData && Array.isArray(lastPlanData.coils)) ? lastPlanData.coils : [];
+  const totalCoils = Number((lastCargoPreview && lastCargoPreview.coil_count) || (lastPlanData && lastPlanData.coil_count) || coilsFromPlan.length || 0);
+  const totalWeight = Number((lastCargoPreview && lastCargoPreview.total_weight_t) || (lastPlanData && lastPlanData.total_weight_t) || coilsFromPlan.reduce((s,c)=>s+Number(c.Weight_t||0),0) || 0);
+  let avgW = Number((lastCargoPreview && (lastCargoPreview.avg_width_m || lastCargoPreview.max_width_m)) || (lastPlanData && (lastPlanData.avg_width_m || lastPlanData.max_width_m)) || 0);
+  if(!(avgW>0) && coilsFromPlan.length){ avgW = coilsFromPlan.reduce((s,c)=>s+Number(c.Width_m||0),0) / coilsFromPlan.length; }
   const avgT = totalCoils ? totalWeight / totalCoils : 0;
   return {totalCoils,totalWeight,avgW,avgT};
 }
@@ -462,7 +464,7 @@ function computeHoldAllocations(commitNext=false){
 }
 function allocationHtml(){
   const r = computeHoldAllocations(false);
-  if(!r.base.totalCoils || !r.base.avgW) return '<div class="details"><b>Allocation Workspace</b><br>Import cargo and build a plan to see live hold-by-hold length, coils and weight.</div>';
+  if(!r.base.totalCoils || !r.base.avgW) return '<div class="details"><b>Allocation Workspace</b><br>Import cargo and build a plan to see live hold-by-hold length, coils and weight.</div>'; // data fallback checked in allocationBase
   const selected = Math.max(0, document.getElementById('holdName').selectedIndex);
   const remainingClass = r.remainingCoils > 0 ? 'bad' : 'ok';
   const rows = r.allocations.map(a => `<tr class="${a.idx===selected ? 'activeAllocRow':''}"><td>${a.name}</td><td>${a.length.toFixed(2)} m</td><td>${a.blocks}</td><td>${a.coils}</td><td>${a.tonnes.toFixed(1)} t</td></tr>`).join('');
@@ -777,6 +779,9 @@ function drawInteractivePlan(data){
   title.textContent = `Hold ${physicalPlanLength.toFixed(2)} m × ${hold.width_m.toFixed(2)} m · selected stowage ${Number(document.getElementById('stowageLength').value || hold.stowage_length_m || hold.length_m).toFixed(2)} m`;
 
   coils.forEach(c => {
+    // v7.1: in Allocation Workspace show only the cargo allocated inside the selected stowage length.
+    // Overflow coils are not drawn as red cargo; the free area remains grey.
+    if(c.Out_of_hold) return;
     const x = pad + c.x0_m * scaleX;
     const y = pad + c.y_m * scaleY;
     const w = Math.max(c.Width_m * scaleX, 14);
