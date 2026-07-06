@@ -30,6 +30,9 @@
     input,textarea{cursor:text}
     input[type=file],input[type=checkbox],input[type=radio]{cursor:pointer}
     input[type=file]{background:#111827}
+    svg g:focus, svg rect:focus, svg line:focus, svg polygon:focus{outline:none}
+    .multiHoldCard{outline:none}
+
     .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
     .btn{width:100%;border:0;border-radius:12px;padding:13px;background:var(--blue);color:white;font-weight:900;margin-top:13px;cursor:pointer}
     .btn:disabled{background:#64748b}
@@ -96,7 +99,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v7.1 beta · Live Hold Allocation</div>
+    <div class="version">v7.2 beta · Multi-Hold Workspace</div>
   </header>
 
   <main class="app">

@@ -1,6 +1,9 @@
-# Steel Coil Planner Pro v7.1 – Live Hold Allocation Fix
+# Steel Coil Planner Pro v7.2 – Multi-Hold Workspace
 
-- Allocation Workspace now uses cargo data from either Import Cargo or Build Plan.
-- Right panel shows live per-hold length, blocks, coils, and weight.
-- Changing hold uses the saved allocation length for that hold.
-- Top View hides overflow cargo beyond the selected marker instead of showing the full cargo again.
+Changes:
+- Shows all holds in one Top View workspace.
+- Each hold has its own independent red drag marker.
+- Dropdown selection only changes the active/focused hold.
+- Marker has no black bounding box.
+- Allocation summary shows total allocated length/weight and per-hold length, blocks, coils and tonnes.
+- Moving a marker updates the allocation live and auto-distributes remaining cargo to following holds.

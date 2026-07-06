@@ -417,49 +417,79 @@ function persistActiveHoldStowage(len){
 function activeFleetShip(){
   return findShipByName(document.getElementById('shipName').value) || currentShipConfig || null;
 }
+function applyHoldLengthAndAutoDistribute(changedIdx, len){
+  const base = allocationBase();
+  const ship = activeFleetShip();
+  if(!(ship && ship.holds && ship.holds.length)) return;
+  const holds = clone(ship.holds);
+  changedIdx = Math.max(0, Math.min(Number(changedIdx)||0, holds.length-1));
+  const h0 = holds[changedIdx];
+  const maxLen0 = Number(h0.hold_length_m || h0.length_m || 0);
+  holds[changedIdx].stowage_length_m = Math.max(0, Math.min(maxLen0 || Number(len)||0, Number(len)||0));
+
+  // Allocate cargo sequentially. Holds before the changed hold keep their saved length.
+  // Holds after the changed hold receive the remaining cargo automatically.
+  if(base.totalCoils>0 && base.avgW>0){
+    const defaultGap = numOrNull(document.getElementById('rowGap').value) || 0;
+    let remaining = base.totalCoils;
+    for(let i=0; i<holds.length; i++){
+      const h = holds[i];
+      const maxLen = Number(h.hold_length_m || h.length_m || 0);
+      const gap = Number(h.row_gap_m || defaultGap || 0);
+      let useLen = Number(h.stowage_length_m || 0);
+      if(i > changedIdx){
+        const cap = capacityForHold(h);
+        const needBlocks = cap ? Math.ceil(remaining / cap) : 0;
+        useLen = Math.min(maxLen, lengthForBlocks(needBlocks, base.avgW, gap));
+        h.stowage_length_m = Number(useLen.toFixed(2));
+      }
+      useLen = Math.max(0, Math.min(maxLen || useLen, useLen));
+      const blocks = blocksForLength(useLen, base.avgW, gap);
+      const coils = Math.min(remaining, blocks * (capacityForHold(h) || 0));
+      remaining = Math.max(0, remaining - coils);
+    }
+  }
+  currentShipConfig = {...clone(ship), holds};
+  upsertLocalShip(currentShipConfig);
+  if(changedIdx === selectedHoldIndex){
+    setVal('stowageLength', holds[changedIdx].stowage_length_m || 0);
+  }
+}
 function computeHoldAllocations(commitNext=false){
   const base = allocationBase();
   const ship = activeFleetShip();
-  const holds = (ship && ship.holds && ship.holds.length) ? clone(ship.holds) : [{hold_name:document.getElementById('holdName').value || 'Hold 1', hold_length_m:numOrNull(document.getElementById('holdLength').value) || 0, hold_width_m:numOrNull(document.getElementById('holdWidth').value) || 0, coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value) || 0, row_gap_m:numOrNull(document.getElementById('rowGap').value) || 0}];
-  const startIdx = Math.max(0, Math.min(document.getElementById('holdName').selectedIndex >= 0 ? document.getElementById('holdName').selectedIndex : selectedHoldIndex, holds.length-1));
-  const rowGap = numOrNull(document.getElementById('rowGap').value) || 0;
-  const manualLen = numOrNull(document.getElementById('stowageLength').value) || numOrNull(document.getElementById('holdLength').value) || 0;
+  const holds = (ship && ship.holds && ship.holds.length) ? clone(ship.holds) : [{hold_name:document.getElementById('holdName').value || 'Hold 1', hold_length_m:numOrNull(document.getElementById('holdLength').value) || 0, hold_width_m:numOrNull(document.getElementById('holdWidth').value) || 0, coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value) || 0, row_gap_m:numOrNull(document.getElementById('rowGap').value) || 0, stowage_length_m:numOrNull(document.getElementById('stowageLength').value) || 0}];
+  const defaultGap = numOrNull(document.getElementById('rowGap').value) || 0;
   let remaining = base.totalCoils;
+  const selected = Math.max(0, document.getElementById('holdName').selectedIndex >= 0 ? document.getElementById('holdName').selectedIndex : selectedHoldIndex);
   const allocations = holds.map((h,i) => ({idx:i, name:h.hold_name || `Hold ${i+1}`, length:0, blocks:0, coils:0, tonnes:0, capacity:capacityForHold(h), maxLen:Number(h.hold_length_m || h.length_m || 0)}));
-  if(!(base.totalCoils>0 && base.avgW>0)){ return {allocations, remainingCoils:0, remainingTonnes:0, totalLength:0, totalWeight:0, base}; }
+  if(!(base.totalCoils>0 && base.avgW>0)){
+    allocations.forEach((a,i)=>{ a.length = Number(holds[i].stowage_length_m || (i===selected ? numOrNull(document.getElementById('stowageLength').value) : 0) || 0); });
+    return {allocations, remainingCoils:0, remainingTonnes:0, totalLength:allocations.reduce((s,a)=>s+a.length,0), totalWeight:0, base};
+  }
   for(let i=0; i<allocations.length; i++){
     const a = allocations[i];
     const h = holds[i] || {};
-    const maxLen = a.maxLen || (i===startIdx ? numOrNull(document.getElementById('holdLength').value) || 0 : 0);
-    let len;
-    if(i < startIdx){
-      len = Math.max(0, Math.min(maxLen, Number(h.stowage_length_m || 0)));
-    } else if(i === startIdx){
-      len = Math.max(0, Math.min(maxLen || manualLen, manualLen));
-    } else {
-      // v7.0 Allocation Workspace: after the active hold, allocate the remaining cargo automatically.
-      // Do not keep stale saved lengths for following holds; they must follow the marker live.
-      const needBlocks = a.capacity ? Math.ceil(remaining / a.capacity) : 0;
-      len = Math.min(maxLen, lengthForBlocks(needBlocks, base.avgW, rowGap));
-    }
-    const blocks = blocksForLength(len, base.avgW, rowGap);
+    const maxLen = a.maxLen || 0;
+    const gap = Number(h.row_gap_m || defaultGap || 0);
+    let len = Number(h.stowage_length_m || 0);
+    if(i === selected){ len = numOrNull(document.getElementById('stowageLength').value) ?? len; }
+    len = Math.max(0, Math.min(maxLen || len, len));
+    const blocks = blocksForLength(len, base.avgW, gap);
     const coils = Math.min(remaining, blocks * (a.capacity || 0));
     a.length = Number(len.toFixed(2));
     a.blocks = blocks;
     a.coils = coils;
     a.tonnes = coils * base.avgT;
     remaining = Math.max(0, remaining - coils);
-    if(commitNext && i >= startIdx){
-      holds[i].stowage_length_m = a.length;
-    }
+    if(commitNext){ holds[i].stowage_length_m = a.length; }
   }
   if(commitNext && ship && ship.holds){
-    ship.holds = holds;
-    currentShipConfig = clone(ship);
+    currentShipConfig = {...clone(ship), holds};
     upsertLocalShip(currentShipConfig);
   }
-  const totalLength = allocations.reduce((s,a)=>s+a.length,0);
-  const totalWeight = allocations.reduce((s,a)=>s+a.tonnes,0);
+  const totalLength = allocations.reduce((sum,a)=>sum+a.length,0);
+  const totalWeight = allocations.reduce((sum,a)=>sum+a.tonnes,0);
   return {allocations, remainingCoils:remaining, remainingTonnes:remaining*base.avgT, totalLength, totalWeight, base};
 }
 function allocationHtml(){
@@ -735,128 +765,123 @@ function updateStowageFromMarker(len, data, liveOnly=false){
 }
 
 function drawInteractivePlan(data){
-  const coils = data.coils || [];
-  const hold = data.hold || {length_m:20, width_m:11.5};
-  const pad = 45;
-  const W = 1000, H = 600;
-  const physicalPlanLength = Number(hold.physical_length_m || hold.length_m || 20);
-  const scaleX = (W - pad*2) / physicalPlanLength;
-  const scaleY = (H - pad*2) / hold.width_m;
-
+  const ship = activeFleetShip();
+  const holds = (ship && ship.holds && ship.holds.length) ? clone(ship.holds) : [{hold_name:document.getElementById('holdName').value || 'Hold 1', hold_length_m:numOrNull(document.getElementById('holdLength').value) || 20, hold_width_m:numOrNull(document.getElementById('holdWidth').value) || 11.5, stowage_length_m:numOrNull(document.getElementById('stowageLength').value) || 0}];
+  const base = allocationBase();
+  const allocations = computeHoldAllocations(false).allocations;
+  const selected = Math.max(0, Math.min(document.getElementById('holdName').selectedIndex >= 0 ? document.getElementById('holdName').selectedIndex : selectedHoldIndex, holds.length-1));
+  const ns = 'http://www.w3.org/2000/svg';
+  const W = 1000, pad = 44;
+  const holdH = 82, gapY = 88;
+  const H = Math.max(600, 90 + holds.length * (holdH + gapY));
   svg.innerHTML = '';
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-
-  const ns = 'http://www.w3.org/2000/svg';
-  function el(name, attrs){
+  svg.style.outline = 'none';
+  function add(name, attrs, parent=svg){
     const e = document.createElementNS(ns, name);
-    Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,v));
-    svg.appendChild(e);
+    Object.entries(attrs || {}).forEach(([k,v]) => e.setAttribute(k,v));
+    parent.appendChild(e);
     return e;
   }
-
-  // hold rectangle
-  el('rect', {x:pad, y:pad, width:physicalPlanLength*scaleX, height:hold.width_m*scaleY, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':2, rx:6});
-
-  // grid every 1 m
-  for(let x=0; x<=physicalPlanLength; x+=1){
-    el('line', {x1:pad+x*scaleX, y1:pad, x2:pad+x*scaleX, y2:pad+hold.width_m*scaleY, stroke:'#e2e8f0', 'stroke-width':1});
+  function setActiveHold(i){
+    selectedHoldIndex = i;
+    const holdSel = document.getElementById('holdName');
+    if(holdSel) holdSel.selectedIndex = i;
+    const h = currentShipConfig.holds && currentShipConfig.holds[i] ? currentShipConfig.holds[i] : holds[i];
+    setVal('holdLength', h.hold_length_m || h.length_m || 0);
+    setVal('holdWidth', h.hold_width_m || h.width_m || 0);
+    setVal('stowageLength', h.stowage_length_m || 0);
+    setVal('rowGap', h.row_gap_m ?? numOrNull(document.getElementById('rowGap').value) ?? 0.15);
+    setVal('coilDiameter', h.coil_diameter_m || h.diameter_m || numOrNull(document.getElementById('coilDiameter').value) || 1.8);
+    renderAllocationSummary();
+    updateAllocationHint();
   }
-  for(let y=0; y<=hold.width_m; y+=1){
-    el('line', {x1:pad, y1:pad+y*scaleY, x2:pad+hold.length_m*scaleX, y2:pad+y*scaleY, stroke:'#e2e8f0', 'stroke-width':1});
-  }
+  const title = add('text',{x:pad,y:28,fill:'#0f172a','font-size':18,'font-weight':900});
+  title.textContent = 'Multi-Hold Allocation Workspace';
+  const subtitle = add('text',{x:pad,y:50,fill:'#475569','font-size':12,'font-weight':700});
+  subtitle.textContent = 'All holds stay visible. Drag a red marker; following holds receive the remaining cargo automatically.';
 
-  // loaded/free shading controlled by the stowage marker
-  const physicalLen = Number(hold.physical_length_m || hold.length_m || 0);
-  const stowInputLen = numOrNull(document.getElementById('stowageLength').value);
-  const activeLen = Math.max(0, Math.min(physicalLen, stowInputLen || Number(hold.stowage_length_m || hold.length_m || 0)));
-  if(physicalLen > 0){
-    el('rect', {id:'loadedShade', x:pad, y:pad, width:activeLen*scaleX, height:hold.width_m*scaleY, fill:'#dcfce7', opacity:.42, 'pointer-events':'none'});
-    el('rect', {id:'freeShade', x:pad+activeLen*scaleX, y:pad, width:Math.max(0,(physicalLen-activeLen)*scaleX), height:hold.width_m*scaleY, fill:'#e5e7eb', opacity:.40, 'pointer-events':'none'});
-  }
-
-  // title inside plan
-  const title = el('text', {x:pad+10, y:pad-15, fill:'#0f172a', 'font-size':14, 'font-weight':'700'});
-  title.textContent = `Hold ${physicalPlanLength.toFixed(2)} m × ${hold.width_m.toFixed(2)} m · selected stowage ${Number(document.getElementById('stowageLength').value || hold.stowage_length_m || hold.length_m).toFixed(2)} m`;
-
-  coils.forEach(c => {
-    // v7.1: in Allocation Workspace show only the cargo allocated inside the selected stowage length.
-    // Overflow coils are not drawn as red cargo; the free area remains grey.
-    if(c.Out_of_hold) return;
-    const x = pad + c.x0_m * scaleX;
-    const y = pad + c.y_m * scaleY;
-    const w = Math.max(c.Width_m * scaleX, 14);
-    const d = Number(c.Diameter_m) || hold.diameter_m || 1.8;
-    const h = Math.min(Math.max(d * scaleY * 0.18, 14), 28);
-    const color = coilColor(c);
-    const g = el('g', {style:'cursor:pointer'});
-    const body = document.createElementNS(ns,'rect');
-    Object.entries({x:x, y:y-h/2, width:w, height:h, rx:h/2, fill:color, stroke:'#0f172a', 'stroke-width':0.8, opacity:0.9}).forEach(([k,v]) => body.setAttribute(k,v));
-    g.appendChild(body);
-    const e1 = document.createElementNS(ns,'ellipse');
-    Object.entries({cx:x, cy:y, rx:h/2, ry:h/2, fill:color, stroke:'#0f172a', 'stroke-width':0.8}).forEach(([k,v]) => e1.setAttribute(k,v));
-    g.appendChild(e1);
-    const e2 = document.createElementNS(ns,'ellipse');
-    Object.entries({cx:x+w, cy:y, rx:h/2, ry:h/2, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':0.8, opacity:.38}).forEach(([k,v]) => e2.setAttribute(k,v));
-    g.appendChild(e2);
-    addTooltip(g,c);
-    g.addEventListener('click', () => showCoilDetails(c));
-    const text = document.createElementNS(ns,'text');
-    Object.entries({x:x+w/2, y:y+4, fill:'#ffffff', 'font-size':8, 'font-weight':'700', 'text-anchor':'middle', 'pointer-events':'none'}).forEach(([k,v]) => text.setAttribute(k,v));
-    text.textContent = c.Out_of_hold ? '!' : c.Position;
-    g.appendChild(text);
+  holds.forEach((h,i) => {
+    const y0 = 82 + i * (holdH + gapY);
+    const holdLen = Number(h.hold_length_m || h.length_m || 20);
+    const holdWidth = Number(h.hold_width_m || h.width_m || numOrNull(document.getElementById('holdWidth').value) || 11.5);
+    const x0 = pad;
+    const planW = W - pad*2;
+    const scaleX = planW / Math.max(holdLen, 0.1);
+    const stowLen = Math.max(0, Math.min(holdLen, Number(h.stowage_length_m || (i===selected ? numOrNull(document.getElementById('stowageLength').value) : 0) || 0)));
+    const alloc = allocations[i] || {coils:0, tonnes:0, blocks:0};
+    const active = i === selected;
+    const panel = add('g', {style:'cursor:pointer'});
+    add('rect',{x:x0-8,y:y0-36,width:planW+16,height:holdH+88,rx:14,fill:active?'#dbeafe':'#f8fafc',stroke:active?'#2563eb':'#cbd5e1','stroke-width':active?2:1}, panel);
+    const lab = add('text',{x:x0,y:y0-14,fill:'#0f172a','font-size':15,'font-weight':900}, panel);
+    lab.textContent = `${h.hold_name || 'Hold '+(i+1)} · ${holdLen.toFixed(2)} m × ${holdWidth.toFixed(2)} m`;
+    const mini = add('text',{x:W-pad,y:y0-14,fill:'#334155','font-size':12,'font-weight':800,'text-anchor':'end'}, panel);
+    mini.textContent = `${stowLen.toFixed(2)} m · ${alloc.coils || 0} coils · ${(alloc.tonnes || 0).toFixed(1)} t`;
+    add('rect',{x:x0,y:y0,width:planW,height:holdH,fill:'#fff',stroke:'#0f172a','stroke-width':2,rx:7}, panel);
+    // length grid and block snap marks
+    for(let x=0; x<=holdLen+1e-9; x+=5){
+      add('line',{x1:x0+x*scaleX,y1:y0,x2:x0+x*scaleX,y2:y0+holdH,stroke:'#e2e8f0','stroke-width':1}, panel);
+      const tx = add('text',{x:x0+x*scaleX,y:y0+holdH+18,fill:'#64748b','font-size':10,'text-anchor':'middle'}, panel);
+      tx.textContent = `${x.toFixed(0)}m`;
+    }
+    const loadedW = Math.max(0, stowLen*scaleX);
+    add('rect',{x:x0,y:y0,width:loadedW,height:holdH,fill:'#bbf7d0',opacity:.72,'pointer-events':'none'}, panel);
+    add('rect',{x:x0+loadedW,y:y0,width:Math.max(0,planW-loadedW),height:holdH,fill:'#e5e7eb',opacity:.58,'pointer-events':'none'}, panel);
+    // simple block visualization in loaded part
+    const avgW = base.avgW || Number((data.coils && data.coils[0] && data.coils[0].Width_m) || 1.2);
+    const rowGap = Number(h.row_gap_m || numOrNull(document.getElementById('rowGap').value) || 0);
+    const blockPitch = (avgW + rowGap) * scaleX;
+    const blockW = Math.max(6, avgW * scaleX);
+    const blocks = blocksForLength(stowLen, avgW, rowGap);
+    for(let b=0; b<blocks; b++){
+      const bx = x0 + b*blockPitch + 2;
+      if(bx + 2 > x0 + loadedW) break;
+      add('rect',{x:bx,y:y0+12,width:Math.min(blockW-4, x0+loadedW-bx),height:holdH-24,rx:6,fill:'#60a5fa',opacity:.45,stroke:'#1d4ed8','stroke-width':0.8}, panel);
+    }
+    const mx = x0 + loadedW;
+    const hit = add('rect',{x:mx-14,y:y0-20,width:28,height:holdH+40,fill:'transparent',stroke:'none',style:'cursor:ew-resize; touch-action:none'}, panel);
+    const line = add('line',{x1:mx,y1:y0-12,x2:mx,y2:y0+holdH+12,stroke:'#dc2626','stroke-width':5,'stroke-linecap':'round','pointer-events':'none'}, panel);
+    const tri = add('polygon',{points:`${mx-14},${y0-26} ${mx+14},${y0-26} ${mx},${y0-6}`,fill:'#dc2626',stroke:'#7f1d1d','stroke-width':1.5,'pointer-events':'none'}, panel);
+    const txt = add('text',{x:mx+8,y:y0+20,fill:'#991b1b','font-size':13,'font-weight':900,stroke:'#fff','stroke-width':0.25,'pointer-events':'none'}, panel);
+    txt.textContent = `${stowLen.toFixed(2)} m`;
+    function snapLen(raw){
+      if(!(base.avgW>0)) return Math.max(0, Math.min(holdLen, raw));
+      const pitch = base.avgW + rowGap;
+      const n = Math.max(0, Math.round((raw + rowGap) / pitch));
+      return Math.max(0, Math.min(holdLen, Number(lengthForBlocks(n, base.avgW, rowGap).toFixed(2))));
+    }
+    function setMarkerFromEvent(evt){
+      const pt = svgPointFromEvent(svg, evt);
+      const rawLen = (pt.x - x0) / scaleX;
+      const newLen = snapLen(rawLen);
+      applyHoldLengthAndAutoDistribute(i, newLen);
+      setActiveHold(i);
+      const fresh = activeFleetShip();
+      const fh = fresh && fresh.holds ? fresh.holds[i] : null;
+      const lenNow = Number((fh && fh.stowage_length_m) || newLen || 0);
+      const xNow = x0 + lenNow*scaleX;
+      const wNow = Math.max(0, lenNow*scaleX);
+      line.setAttribute('x1', xNow); line.setAttribute('x2', xNow);
+      hit.setAttribute('x', xNow-14);
+      tri.setAttribute('points', `${xNow-14},${y0-26} ${xNow+14},${y0-26} ${xNow},${y0-6}`);
+      txt.setAttribute('x', xNow+8); txt.textContent = `${lenNow.toFixed(2)} m`;
+      renderAllocationSummary();
+    }
+    let dragging=false;
+    hit.addEventListener('pointerdown', evt => { dragging=true; hit.setPointerCapture(evt.pointerId); setMarkerFromEvent(evt); });
+    hit.addEventListener('pointermove', evt => { if(dragging) setMarkerFromEvent(evt); });
+    hit.addEventListener('pointerup', evt => { dragging=false; });
+    hit.addEventListener('pointercancel', () => { dragging=false; });
+    panel.addEventListener('click', evt => { if(evt.target !== hit) setActiveHold(i); });
   });
 
-  // visible loaded/free zones and drag instruction
-  const instrBg = el('rect', {x:pad, y:pad+hold.width_m*scaleY+18, width:Math.min(430, physicalPlanLength*scaleX), height:28, fill:'#fee2e2', stroke:'#dc2626', 'stroke-width':1, rx:6});
-  const instr = el('text', {x:pad+10, y:pad+hold.width_m*scaleY+38, fill:'#991b1b', 'font-size':13, 'font-weight':'900'});
-  instr.textContent = 'Drag red marker: choose stowage length (snaps to complete blocks)';
-
-  // draggable stowage length marker. It snaps to complete block ends.
-  const snapEnds = blockSnapLengths(data);
-  let markerLen = closestSnap(numOrNull(document.getElementById('stowageLength').value) || Number(hold.stowage_length_m || hold.length_m || 0), snapEnds, physicalLen || hold.length_m);
-  updateStowageFromMarker(markerLen, data, true);
-  const markerX = () => pad + markerLen * scaleX;
-  const markerGroup = el('g', {style:'cursor:ew-resize; touch-action:none' });
-  const markerLine = document.createElementNS(ns,'line');
-  Object.entries({x1:markerX(),y1:pad-10,x2:markerX(),y2:pad+hold.width_m*scaleY+10,stroke:'#dc2626','stroke-width':7, 'stroke-linecap':'round'}).forEach(([k,v])=>markerLine.setAttribute(k,v));
-  markerGroup.appendChild(markerLine);
-  const markerTri = document.createElementNS(ns,'polygon');
-  Object.entries({points:`${markerX()-16},${pad-28} ${markerX()+16},${pad-28} ${markerX()},${pad-5}`,fill:'#dc2626',stroke:'#7f1d1d','stroke-width':2}).forEach(([k,v])=>markerTri.setAttribute(k,v));
-  markerGroup.appendChild(markerTri);
-  const markerText = document.createElementNS(ns,'text');
-  Object.entries({id:'markerReadout',x:markerX()+12,y:pad+24,fill:'#991b1b','font-size':16,'font-weight':900,stroke:'#fff','stroke-width':0.4}).forEach(([k,v])=>markerText.setAttribute(k,v));
-  markerText.textContent = `Stowage marker: ${markerLen.toFixed(2)} m`;
-  markerGroup.appendChild(markerText);
-  svg.appendChild(markerGroup);
-  function setMarkerFromEvent(evt){
-    const pt = svgPointFromEvent(svg, evt);
-    const rawLen = (pt.x - pad) / scaleX;
-    markerLen = closestSnap(rawLen, snapEnds, physicalLen || hold.length_m);
-    const xNow = markerX();
-    markerLine.setAttribute('x1', xNow); markerLine.setAttribute('x2', xNow);
-    markerTri.setAttribute('points', `${xNow-16},${pad-28} ${xNow+16},${pad-28} ${xNow},${pad-5}`);
-    markerText.setAttribute('x', xNow+8);
-    const loadedShade = document.getElementById('loadedShade');
-    const freeShade = document.getElementById('freeShade');
-    if(loadedShade) loadedShade.setAttribute('width', Math.max(0, markerLen*scaleX));
-    if(freeShade){ freeShade.setAttribute('x', pad+markerLen*scaleX); freeShade.setAttribute('width', Math.max(0,(physicalLen-markerLen)*scaleX)); }
-    updateStowageFromMarker(markerLen, data, true);
-  }
-  let dragging = false;
-  markerGroup.addEventListener('pointerdown', evt => { dragging=true; markerGroup.setPointerCapture(evt.pointerId); setMarkerFromEvent(evt); });
-  markerGroup.addEventListener('pointermove', evt => { if(dragging) setMarkerFromEvent(evt); });
-  markerGroup.addEventListener('pointerup', evt => { dragging=false; updateStowageFromMarker(markerLen, data, false); commitAllocationToNextHolds({regenerate:false}); });
-  markerGroup.addEventListener('pointercancel', () => dragging=false);
-  markerGroup.setAttribute('tabindex','0');
-  markerGroup.addEventListener('keydown', evt => { if(evt.key === 'Enter'){ evt.preventDefault(); commitAllocationToNextHolds({regenerate:false}); renderAllocationSummary(); } });
-
-  const key = el('text', {x:pad+10, y:H-18, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
-  key.textContent = 'Top View: drag red marker to choose stowage length. Marker snaps to complete blocks; green = loaded, grey = free.';
-
+  const key = add('text', {x:pad, y:H-22, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
+  key.textContent = 'Green = allocated length. Grey = free length. Red marker snaps to complete blocks. Each hold has its own marker.';
   lastPlanData = data;
   emptyPlan.style.display = 'none';
   svg.style.display = currentView === 'top' ? 'block' : 'none';
   legend.style.display = 'block';
+  renderAllocationSummary();
   if(currentView === 'section') selectView('section');
   if(currentView === '3d') selectView('3d');
 }
