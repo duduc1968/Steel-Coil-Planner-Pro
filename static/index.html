@@ -152,7 +152,7 @@
             </div>
             <div class="two">
               <div><label>Wedge</label><select id="builderWedge"><option value="yes">Yes</option><option value="no">No</option></select></div>
-              <div><label>Upper row</label><input id="builderUpper" value="4" inputmode="numeric"></div>
+              <div><label>Upper row auto</label><input id="builderUpper" value="4" inputmode="numeric" readonly></div>
             </div>
             <input type="hidden" name="builder_pattern" id="builderPattern" value="3+3 / Wedge / 4">
             <div class="hint" id="builderPreview" style="margin-top:6px">Builder pattern: 3+3 / Wedge / 4</div>
@@ -377,7 +377,13 @@ document.getElementById('deleteShipBtn').addEventListener('click', async () => {
 function buildPatternText(){
   const p = parseInt(builderPort.value || '0', 10);
   const s = parseInt(builderStbd.value || '0', 10);
-  const u = parseInt(builderUpper.value || '0', 10);
+  let u = parseInt(builderUpper.value || '0', 10);
+  // Wedge rule: upper tier is automatically one fewer than bottom on each side.
+  // Example: 4+4 bottom => upper 6 (3+3); 5+4 bottom => upper 7 (4+3).
+  if(builderWedge.value === 'yes' && p > 0 && s > 0){
+    u = Math.max(p - 1, 0) + Math.max(s - 1, 0);
+    builderUpper.value = String(u);
+  }
   let parts = [];
   if(p > 0 && s > 0) parts.push(`${p}+${s}`);
   else if(p + s > 0) parts.push(`${p+s}`);

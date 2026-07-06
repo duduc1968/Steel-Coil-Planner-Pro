@@ -95,8 +95,15 @@ def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, 
     """Manual pattern parser.
     Syntax: tiers from bottom upwards separated by /, e.g.
     '3+3 / Wedge / 4', '6 / 5 / 4', '4+4 / Center / 3'.
-    Number = centered row with that many coils. A+B = split row with central gap.
-    Wedge/Center = one centered coil.
+
+    Important wedge rule used from v4.7:
+    - If the bottom tier is split port/starboard (A+B) and a Wedge/Center is used,
+      the upper tier is calculated from the bottom tier automatically:
+          port upper  = A - 1
+          stbd upper  = B - 1
+      So 4+4 / Wedge gives 3+3 upper coils, and 5+4 / Wedge gives 4+3.
+    - Upper coils and wedge are placed in the valleys between bottom coils and in
+      geometrical contact with the supporting bottom coils.
     """
     W = float(hold_width_m); D = float(diameter_m); r = D / 2
     gap = 0.70 if center_gap_m in [None, ""] else float(center_gap_m)
@@ -106,85 +113,106 @@ def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, 
     tiers = [t.strip() for t in text.replace('\\', '/').split('/') if t.strip()]
     if not tiers:
         raise ValueError("Custom row arrangement is empty. Example: 3+3 / Wedge / 4")
+
     positions = []
     z0 = r + 0.20
     z_step = math.sqrt(max(D**2 - (D / 2)**2, 0))
     last_y = []
-    support_y = []  # last real supporting row; wedge/center does not replace it
+    support_y = []          # last real supporting bottom row
+    support_left = []       # port side bottom row when bottom tier is A+B
+    support_right = []      # starboard side bottom row when bottom tier is A+B
+    wedge_seen = False
     upper_level = 1
+
+    def valley_z(left_y, right_y):
+        """Height of a coil resting between two supporting coils."""
+        dx = abs(float(right_y) - float(left_y)) / 2
+        if dx >= D:
+            # Too far apart to touch both; keep a safe visual height rather than failing.
+            return z0 + z_step
+        return z0 + math.sqrt(max(D**2 - dx**2, 0))
+
     for level, token in enumerate(tiers):
         low = token.lower().replace(' ', '')
         # Geometrical tier: bottom is tier 1; wedge and all rows above it are tier 2.
-        z = z0 if level == 0 else z0 + z_step
+        default_z = z0 if level == 0 else z0 + z_step
+
         if low in ["wedge", "center", "centre", "c", "w"]:
-            y = W / 2
             base = support_y or last_y
-            if len(base) >= 2:
-                left = max([v for v in base if v <= y], default=None)
-                right = min([v for v in base if v >= y], default=None)
-                if left is not None and right is not None and right > left:
-                    dx = (right - left) / 2
-                    if dx < D:
-                        z = z0 + math.sqrt(max(D**2 - dx**2, 0))
+            if support_left and support_right:
+                left_support = support_left[-1]
+                right_support = support_right[0]
+                y = (left_support + right_support) / 2
+                z = valley_z(left_support, right_support)
+            else:
+                y = W / 2
+                z = default_z
+                if len(base) >= 2:
+                    left = max([v for v in base if v <= y], default=None)
+                    right = min([v for v in base if v >= y], default=None)
+                    if left is not None and right is not None and right > left:
+                        z = valley_z(left, right)
             tier_name = "Wedge" if low.startswith('w') else "Center"
             positions.append((tier_name, f"{tier_name[0]}1", y, z))
             last_y = [y]
+            wedge_seen = True
             continue
+
         if '+' in low:
             parts = low.split('+')
             if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
                 left_n, right_n = int(parts[0]), int(parts[1])
                 left, right = _split_centers(left_n, right_n, W, D, gap)
                 ys = left + right
+                # A split row at the bottom defines the true supporting row and center gap.
+                if level == 0:
+                    support_left = left
+                    support_right = right
             else:
                 raise ValueError(f"Cannot read custom tier '{token}'. Use e.g. 3+3, 6, Wedge, Center.")
         elif low.isdigit():
-            n = int(low)
+            requested_n = int(low)
             base = support_y or last_y
-            # If possible, upper rows sit in the valleys between the lower row.
-            # When a wedge/center exists, upper coils must be distributed around it:
-            #   2 => 1 port + 1 starboard
-            #   3 => 2 port + 1 starboard
-            #   4 => 2 port + 2 starboard
-            # and so on. Each selected upper coil sits between two bottom coils.
-            if level > 0 and len(base) >= 2 and n <= len(base) - 1:
-                gaps = [(base[i+1] - base[i], (base[i] + base[i+1]) / 2) for i in range(len(base)-1)]
-                valid = [(dist, mid) for dist, mid in gaps if dist <= D * 1.35]
-                if len(valid) >= n:
-                    wedge_positions = [p for p in positions if p[0] in ("Wedge", "Center")]
-                    if wedge_positions:
-                        wedge_y = float(wedge_positions[-1][2])
-                        left = [mid for _, mid in valid if mid < wedge_y]
-                        right = [mid for _, mid in valid if mid > wedge_y]
-                        left_n = (n + 1) // 2
-                        right_n = n // 2
-                        # Select valleys closest to the wedge on each side, then draw port-to-starboard.
-                        chosen_left = sorted(sorted(left, key=lambda y: abs(y - wedge_y))[:left_n])
-                        chosen_right = sorted(sorted(right, key=lambda y: abs(y - wedge_y))[:right_n])
-                        ys = chosen_left + chosen_right
-                        # Fallback if one side has too few valleys.
-                        if len(ys) < n:
-                            chosen = set(ys)
-                            extras = [mid for _, mid in sorted(valid, key=lambda dm: abs(dm[1] - wedge_y)) if mid not in chosen]
-                            ys = sorted(ys + extras[:n-len(ys)])
-                    else:
-                        # No wedge: keep normal port-to-starboard valley order.
-                        ys = [mid for _, mid in valid[:n]]
+            # With a wedge over a split bottom row, upper tier is NOT a centered row.
+            # It is automatically one coil fewer than the bottom tier on each side:
+            # 4+4 bottom -> 3+3 upper; 5+4 bottom -> 4+3 upper.
+            if level > 0 and wedge_seen and support_left and support_right:
+                left_mids = [(support_left[i] + support_left[i+1]) / 2 for i in range(len(support_left)-1)]
+                right_mids = [(support_right[i] + support_right[i+1]) / 2 for i in range(len(support_right)-1)]
+                ys = left_mids + right_mids
+                # Store per-coil Z so each upper coil touches its two supporting bottom coils.
+                per_coil_z = {}
+                for i in range(len(support_left)-1):
+                    mid = left_mids[i]
+                    per_coil_z[mid] = valley_z(support_left[i], support_left[i+1])
+                for i in range(len(support_right)-1):
+                    mid = right_mids[i]
+                    per_coil_z[mid] = valley_z(support_right[i], support_right[i+1])
+            elif level > 0 and len(base) >= 2 and requested_n <= len(base) - 1:
+                gaps = [(base[i+1] - base[i], (base[i] + base[i+1]) / 2, base[i], base[i+1]) for i in range(len(base)-1)]
+                valid = [(dist, mid, a, b) for dist, mid, a, b in gaps if dist <= D * 1.35]
+                if len(valid) >= requested_n:
+                    ys = [mid for _, mid, _, _ in valid[:requested_n]]
+                    per_coil_z = {mid: valley_z(a, b) for _, mid, a, b in valid[:requested_n]}
                 else:
-                    ys = _row_centers(n, W, D)
+                    ys = _row_centers(requested_n, W, D)
+                    per_coil_z = {}
             else:
-                ys = _row_centers(n, W, D)
+                ys = _row_centers(requested_n, W, D)
+                per_coil_z = {}
         else:
             raise ValueError(f"Cannot read custom tier '{token}'. Use e.g. 3+3, 6, Wedge, Center.")
+
         tier_name = "Bottom" if level == 0 else "Upper"
-        prefix = "B" if level == 0 else f"U2-"
+        prefix = "B" if level == 0 else f"U{upper_level}-"
         for i, y in enumerate(ys):
+            z = z0 if tier_name == "Bottom" else (per_coil_z.get(y, default_z) if 'per_coil_z' in locals() else default_z)
             positions.append((tier_name, f"{prefix}{i+1}", y, z))
+        if 'per_coil_z' in locals():
+            del per_coil_z
         last_y = ys
         if tier_name == "Bottom":
             support_y = ys
-        elif ys:
-            support_y = support_y or ys
         upper_level += 1
     return positions
 
