@@ -1,4 +1,4 @@
-# Steel Coil Planner Pro v4.9
+# Steel Coil Planner Pro v5.0
 
 ## Fleet Library Save Fix
 
@@ -16,3 +16,10 @@ This build fixes the Ship/Fleet Library selection and persistence workflow.
 - Auto central gap calculation.
 - 2 wedge coils recommended when the central gap is greater than one third of the planning diameter.
 - Multiple holds per vessel.
+
+
+## v5.0 Fleet Library Sync Fix
+- Selecting a saved ship immediately loads the selected hold into Voyage Setup.
+- Changing Hold Selector immediately syncs the selected hold into Voyage Setup.
+- Save Ship now saves and reloads the selected hold into Voyage Setup.
+- Load / Sync button remains available as a manual confirmation.
