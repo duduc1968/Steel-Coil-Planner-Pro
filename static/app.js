@@ -657,20 +657,25 @@ function drawInteractivePlan(data){
     g.appendChild(text);
   });
 
+  // visible loaded/free zones and drag instruction
+  const instrBg = el('rect', {x:pad, y:pad+hold.width_m*scaleY+18, width:Math.min(430, physicalPlanLength*scaleX), height:28, fill:'#fee2e2', stroke:'#dc2626', 'stroke-width':1, rx:6});
+  const instr = el('text', {x:pad+10, y:pad+hold.width_m*scaleY+38, fill:'#991b1b', 'font-size':13, 'font-weight':'900'});
+  instr.textContent = 'Drag red marker: choose stowage length (snaps to complete blocks)';
+
   // draggable stowage length marker. It snaps to complete block ends.
   const snapEnds = blockSnapLengths(data);
   let markerLen = closestSnap(numOrNull(document.getElementById('stowageLength').value) || Number(hold.stowage_length_m || hold.length_m || 0), snapEnds, physicalLen || hold.length_m);
   updateStowageFromMarker(markerLen, data, true);
   const markerX = () => pad + markerLen * scaleX;
-  const markerGroup = el('g', {style:'cursor:ew-resize'});
+  const markerGroup = el('g', {style:'cursor:ew-resize; touch-action:none' });
   const markerLine = document.createElementNS(ns,'line');
-  Object.entries({x1:markerX(),y1:pad-10,x2:markerX(),y2:pad+hold.width_m*scaleY+10,stroke:'#dc2626','stroke-width':4}).forEach(([k,v])=>markerLine.setAttribute(k,v));
+  Object.entries({x1:markerX(),y1:pad-10,x2:markerX(),y2:pad+hold.width_m*scaleY+10,stroke:'#dc2626','stroke-width':7, 'stroke-linecap':'round'}).forEach(([k,v])=>markerLine.setAttribute(k,v));
   markerGroup.appendChild(markerLine);
   const markerTri = document.createElementNS(ns,'polygon');
-  Object.entries({points:`${markerX()-9},${pad-18} ${markerX()+9},${pad-18} ${markerX()},${pad-4}`,fill:'#dc2626'}).forEach(([k,v])=>markerTri.setAttribute(k,v));
+  Object.entries({points:`${markerX()-16},${pad-28} ${markerX()+16},${pad-28} ${markerX()},${pad-5}`,fill:'#dc2626',stroke:'#7f1d1d','stroke-width':2}).forEach(([k,v])=>markerTri.setAttribute(k,v));
   markerGroup.appendChild(markerTri);
   const markerText = document.createElementNS(ns,'text');
-  Object.entries({id:'markerReadout',x:markerX()+8,y:pad+18,fill:'#991b1b','font-size':13,'font-weight':900}).forEach(([k,v])=>markerText.setAttribute(k,v));
+  Object.entries({id:'markerReadout',x:markerX()+12,y:pad+24,fill:'#991b1b','font-size':16,'font-weight':900,stroke:'#fff','stroke-width':0.4}).forEach(([k,v])=>markerText.setAttribute(k,v));
   markerText.textContent = `Stowage marker: ${markerLen.toFixed(2)} m`;
   markerGroup.appendChild(markerText);
   svg.appendChild(markerGroup);
@@ -680,7 +685,7 @@ function drawInteractivePlan(data){
     markerLen = closestSnap(rawLen, snapEnds, physicalLen || hold.length_m);
     const xNow = markerX();
     markerLine.setAttribute('x1', xNow); markerLine.setAttribute('x2', xNow);
-    markerTri.setAttribute('points', `${xNow-9},${pad-18} ${xNow+9},${pad-18} ${xNow},${pad-4}`);
+    markerTri.setAttribute('points', `${xNow-16},${pad-28} ${xNow+16},${pad-28} ${xNow},${pad-5}`);
     markerText.setAttribute('x', xNow+8);
     updateStowageFromMarker(markerLen, data, true);
   }

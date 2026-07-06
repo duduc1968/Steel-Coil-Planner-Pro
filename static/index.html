@@ -95,7 +95,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v6.0 beta · Interactive Hold Planning</div>
+    <div class="version">v6.1 beta · Visible Drag Marker</div>
   </header>
 
   <main class="app">
@@ -123,7 +123,7 @@
             <div><label>Stowage length to use m</label><input name="stowage_length_m" id="stowageLength" value="20.0" inputmode="decimal"></div>
             <div><label>Row gap m</label><input name="row_gap_m" id="rowGap" value="0.15" inputmode="decimal"></div>
           </div>
-          <div class="hint" id="allocationHint">Drag the marker in Top View or type a length. The marker snaps to complete stowage blocks and estimates remaining cargo.</div>
+          <div class="hint" id="allocationHint">Drag the red marker in Top View or type a length. Marker snaps to complete blocks and updates the allocation estimate.</div>
 
           <label>Average diameter m</label>
           <input name="coil_diameter_m" id="coilDiameter" value="1.8" inputmode="decimal">
@@ -844,12 +844,51 @@ function addTooltip(el, c){
 }
 
 
+function svgPointFromEvent(svgNode, evt){
+  const pt = svgNode.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svgNode.getScreenCTM().inverse());
+}
+function blockSnapLengths(data){
+  const coils = data.coils || [];
+  const hold = data.hold || {};
+  const physical = Number(hold.physical_length_m || hold.length_m || 0);
+  const ends = [...new Set(coils.map(c => Number(c.block_x1_m || c.x1_m || 0)).filter(v => v>0 && v<=physical+1e-9).map(v => Number(v.toFixed(3))))].sort((a,b)=>a-b);
+  if(!ends.length && lastCargoPreview){
+    const cap = estimatePatternCapacity();
+    const avgW = Number(lastCargoPreview.avg_width_m || lastCargoPreview.max_width_m || 0);
+    const gap = numOrNull(document.getElementById('rowGap').value) || 0;
+    if(cap>0 && avgW>0){
+      let x = avgW, out=[];
+      while(x <= physical + 1e-9){ out.push(Number(x.toFixed(3))); x += avgW + gap; }
+      return out;
+    }
+  }
+  return ends;
+}
+function closestSnap(value, snaps, maxLen){
+  if(!snaps || !snaps.length) return Math.max(0, Math.min(maxLen, value));
+  let best = snaps[0], dist = Math.abs(value - best);
+  for(const s of snaps){ const d = Math.abs(value-s); if(d < dist){ best=s; dist=d; } }
+  return Math.max(0, Math.min(maxLen, best));
+}
+function updateStowageFromMarker(len, data, liveOnly=false){
+  const holdLen = Number((data.hold && (data.hold.physical_length_m || data.hold.length_m)) || numOrNull(document.getElementById('holdLength').value) || 0);
+  len = Math.max(0, Math.min(holdLen, Number(len)||0));
+  const el = document.getElementById('stowageLength');
+  el.value = len.toFixed(2);
+  updateAllocationHint();
+  const label = document.getElementById('markerReadout');
+  if(label) label.textContent = `Stowage marker: ${len.toFixed(2)} m`;
+}
+
 function drawInteractivePlan(data){
   const coils = data.coils || [];
   const hold = data.hold || {length_m:20, width_m:11.5};
   const pad = 45;
   const W = 1000, H = 600;
-  const scaleX = (W - pad*2) / hold.length_m;
+  const physicalPlanLength = Number(hold.physical_length_m || hold.length_m || 20);
+  const scaleX = (W - pad*2) / physicalPlanLength;
   const scaleY = (H - pad*2) / hold.width_m;
 
   svg.innerHTML = '';
@@ -864,19 +903,28 @@ function drawInteractivePlan(data){
   }
 
   // hold rectangle
-  el('rect', {x:pad, y:pad, width:hold.length_m*scaleX, height:hold.width_m*scaleY, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':2, rx:6});
+  el('rect', {x:pad, y:pad, width:physicalPlanLength*scaleX, height:hold.width_m*scaleY, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':2, rx:6});
 
   // grid every 1 m
-  for(let x=0; x<=hold.length_m; x+=1){
+  for(let x=0; x<=physicalPlanLength; x+=1){
     el('line', {x1:pad+x*scaleX, y1:pad, x2:pad+x*scaleX, y2:pad+hold.width_m*scaleY, stroke:'#e2e8f0', 'stroke-width':1});
   }
   for(let y=0; y<=hold.width_m; y+=1){
     el('line', {x1:pad, y1:pad+y*scaleY, x2:pad+hold.length_m*scaleX, y2:pad+y*scaleY, stroke:'#e2e8f0', 'stroke-width':1});
   }
 
+  // loaded/free shading controlled by the stowage marker
+  const physicalLen = Number(hold.physical_length_m || hold.length_m || 0);
+  const stowInputLen = numOrNull(document.getElementById('stowageLength').value);
+  const activeLen = Math.max(0, Math.min(physicalLen, stowInputLen || Number(hold.stowage_length_m || hold.length_m || 0)));
+  if(physicalLen > 0){
+    el('rect', {x:pad, y:pad, width:activeLen*scaleX, height:hold.width_m*scaleY, fill:'#dcfce7', opacity:.42, 'pointer-events':'none'});
+    el('rect', {x:pad+activeLen*scaleX, y:pad, width:Math.max(0,(physicalLen-activeLen)*scaleX), height:hold.width_m*scaleY, fill:'#e5e7eb', opacity:.40, 'pointer-events':'none'});
+  }
+
   // title inside plan
   const title = el('text', {x:pad+10, y:pad-15, fill:'#0f172a', 'font-size':14, 'font-weight':'700'});
-  title.textContent = `Hold ${hold.length_m.toFixed(2)} m × ${hold.width_m.toFixed(2)} m`;
+  title.textContent = `Hold ${physicalPlanLength.toFixed(2)} m × ${hold.width_m.toFixed(2)} m · selected stowage ${Number(document.getElementById('stowageLength').value || hold.stowage_length_m || hold.length_m).toFixed(2)} m`;
 
   coils.forEach(c => {
     const x = pad + c.x0_m * scaleX;
@@ -903,8 +951,46 @@ function drawInteractivePlan(data){
     g.appendChild(text);
   });
 
+  // visible loaded/free zones and drag instruction
+  const instrBg = el('rect', {x:pad, y:pad+hold.width_m*scaleY+18, width:Math.min(430, physicalPlanLength*scaleX), height:28, fill:'#fee2e2', stroke:'#dc2626', 'stroke-width':1, rx:6});
+  const instr = el('text', {x:pad+10, y:pad+hold.width_m*scaleY+38, fill:'#991b1b', 'font-size':13, 'font-weight':'900'});
+  instr.textContent = 'Drag red marker: choose stowage length (snaps to complete blocks)';
+
+  // draggable stowage length marker. It snaps to complete block ends.
+  const snapEnds = blockSnapLengths(data);
+  let markerLen = closestSnap(numOrNull(document.getElementById('stowageLength').value) || Number(hold.stowage_length_m || hold.length_m || 0), snapEnds, physicalLen || hold.length_m);
+  updateStowageFromMarker(markerLen, data, true);
+  const markerX = () => pad + markerLen * scaleX;
+  const markerGroup = el('g', {style:'cursor:ew-resize; touch-action:none' });
+  const markerLine = document.createElementNS(ns,'line');
+  Object.entries({x1:markerX(),y1:pad-10,x2:markerX(),y2:pad+hold.width_m*scaleY+10,stroke:'#dc2626','stroke-width':7, 'stroke-linecap':'round'}).forEach(([k,v])=>markerLine.setAttribute(k,v));
+  markerGroup.appendChild(markerLine);
+  const markerTri = document.createElementNS(ns,'polygon');
+  Object.entries({points:`${markerX()-16},${pad-28} ${markerX()+16},${pad-28} ${markerX()},${pad-5}`,fill:'#dc2626',stroke:'#7f1d1d','stroke-width':2}).forEach(([k,v])=>markerTri.setAttribute(k,v));
+  markerGroup.appendChild(markerTri);
+  const markerText = document.createElementNS(ns,'text');
+  Object.entries({id:'markerReadout',x:markerX()+12,y:pad+24,fill:'#991b1b','font-size':16,'font-weight':900,stroke:'#fff','stroke-width':0.4}).forEach(([k,v])=>markerText.setAttribute(k,v));
+  markerText.textContent = `Stowage marker: ${markerLen.toFixed(2)} m`;
+  markerGroup.appendChild(markerText);
+  svg.appendChild(markerGroup);
+  function setMarkerFromEvent(evt){
+    const pt = svgPointFromEvent(svg, evt);
+    const rawLen = (pt.x - pad) / scaleX;
+    markerLen = closestSnap(rawLen, snapEnds, physicalLen || hold.length_m);
+    const xNow = markerX();
+    markerLine.setAttribute('x1', xNow); markerLine.setAttribute('x2', xNow);
+    markerTri.setAttribute('points', `${xNow-16},${pad-28} ${xNow+16},${pad-28} ${xNow},${pad-5}`);
+    markerText.setAttribute('x', xNow+8);
+    updateStowageFromMarker(markerLen, data, true);
+  }
+  let dragging = false;
+  markerGroup.addEventListener('pointerdown', evt => { dragging=true; markerGroup.setPointerCapture(evt.pointerId); setMarkerFromEvent(evt); });
+  markerGroup.addEventListener('pointermove', evt => { if(dragging) setMarkerFromEvent(evt); });
+  markerGroup.addEventListener('pointerup', evt => { dragging=false; updateStowageFromMarker(markerLen, data, false); });
+  markerGroup.addEventListener('pointercancel', () => dragging=false);
+
   const key = el('text', {x:pad+10, y:H-18, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
-  key.textContent = 'Top View: longitudinal stowage blocks as originally designed. Colors are only subtle tier identification.';
+  key.textContent = 'Top View: drag red marker to choose stowage length. Marker snaps to complete blocks; green = loaded, grey = free.';
 
   lastPlanData = data;
   emptyPlan.style.display = 'none';
