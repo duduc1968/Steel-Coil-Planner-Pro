@@ -1,8 +1,11 @@
-# Steel Coil Planner Pro v6.3 – Live Allocation Summary
+# Steel Coil Planner Pro v7.0 – Allocation Workspace
 
-Changes:
-- Drag marker automatically commits stowage length for the active hold.
-- Remaining cargo is allocated to following holds without pressing Generate Plan.
-- Hold dropdown shows each hold's saved allocation when selected.
-- Summary panel shows total allocated length/weight plus length, blocks, coils and weight per hold.
-- Generate Plan is triggered automatically after marker release, Enter, manual length change, or hold change when cargo is loaded.
+This build introduces a live Allocation Workspace:
+
+- Drag the red marker in Top View to set stowage length.
+- Marker snaps to complete block ends.
+- Allocation is recalculated live without pressing Generate Plan again.
+- Remaining cargo is automatically allocated to the following hold(s).
+- Right-side Allocation Workspace shows length, blocks, coils and weight per hold.
+- Fleet Library hold dropdown remains synced with Voyage Setup.
+

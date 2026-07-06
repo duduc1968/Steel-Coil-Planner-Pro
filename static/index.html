@@ -96,7 +96,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v6.3 beta · Live Allocation Summary</div>
+    <div class="version">v7.0 beta · Allocation Workspace</div>
   </header>
 
   <main class="app">
@@ -221,6 +221,13 @@
             <div class="panel-title">Summary</div>
             <div class="panel-body" id="summaryBox">
               <div class="details">Results will appear after calculation.</div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">Allocation Workspace</div>
+            <div class="panel-body" id="allocationWorkspace">
+              <div class="details"><b>Hold allocation</b><br>Import cargo and build a plan to see length, coils and weight per hold.</div>
             </div>
           </section>
 
@@ -596,6 +603,8 @@ document.getElementById('shipName').addEventListener('change', () => {
     selectedShipFile = currentShipConfig._file || selectedShipFile;
     selectedHoldIndex = 0;
     applyShipToMainForm(currentShipConfig);
+    renderAllocationSummary();
+    autoGeneratePlan(300);
   }
 });
 document.getElementById('holdName').addEventListener('change', () => {
@@ -605,6 +614,8 @@ document.getElementById('holdName').addEventListener('change', () => {
     currentShipConfig = clone(ship);
     selectedHoldIndex = Math.max(0, document.getElementById('holdName').selectedIndex);
     applyShipToMainForm(currentShipConfig);
+    renderAllocationSummary();
+    autoGeneratePlan(300);
   }
 });
 
@@ -652,6 +663,134 @@ function estimatePatternCapacity(){
   const wedgeCount = gap > D/3 ? 2 : 1;
   return bottom + upper + wedgeCount;
 }
+function allocationBase(){
+  const totalCoils = Number((lastCargoPreview && lastCargoPreview.coil_count) || (lastPlanData && lastPlanData.coil_count) || 0);
+  const totalWeight = Number((lastCargoPreview && lastCargoPreview.total_weight_t) || (lastPlanData && lastPlanData.total_weight_t) || 0);
+  const avgW = Number((lastCargoPreview && (lastCargoPreview.avg_width_m || lastCargoPreview.max_width_m)) || 0);
+  const avgT = totalCoils ? totalWeight / totalCoils : 0;
+  return {totalCoils,totalWeight,avgW,avgT};
+}
+function capacityForHold(h){
+  const W = Number(h.hold_width_m || h.width_m || numOrNull(document.getElementById('holdWidth').value) || 0);
+  const D = Number(h.coil_diameter_m || h.diameter_m || numOrNull(document.getElementById('coilDiameter').value) || 0);
+  if(!(W>0 && D>0)) return estimatePatternCapacity();
+  let bottom = Math.floor(W / D + 1e-9);
+  let gap = W - bottom * D;
+  if(gap < 0){ bottom = Math.max(0,bottom-1); gap = W - bottom * D; }
+  const port = Math.ceil(bottom / 2), stbd = bottom - port;
+  const upper = Math.max(port-1,0) + Math.max(stbd-1,0);
+  const wedgeCount = gap > D/3 ? 2 : 1;
+  return bottom + upper + wedgeCount;
+}
+function lengthForBlocks(blocks, avgW, rowGap){
+  blocks = Math.max(0, Math.floor(blocks || 0));
+  return blocks ? blocks * avgW + Math.max(0, blocks-1) * rowGap : 0;
+}
+function blocksForLength(len, avgW, rowGap){
+  if(!(len>0 && avgW>0)) return 0;
+  return Math.max(0, Math.floor((len + rowGap + 1e-9) / (avgW + rowGap)));
+}
+
+let autoPlanTimer = null;
+function hasCargoFile(){
+  const f = document.getElementById('cargoFile');
+  return !!(f && f.files && f.files.length);
+}
+function autoGeneratePlan(delay=350){
+  if(!hasCargoFile()) return;
+  clearTimeout(autoPlanTimer);
+  autoPlanTimer = setTimeout(() => {
+    const formEl = document.getElementById('form');
+    if(formEl) formEl.requestSubmit();
+  }, delay);
+}
+function persistActiveHoldStowage(len){
+  const ship = activeFleetShip();
+  if(!(ship && ship.holds && ship.holds.length)) return;
+  const idx = Math.max(0, Math.min(document.getElementById('holdName').selectedIndex >= 0 ? document.getElementById('holdName').selectedIndex : selectedHoldIndex, ship.holds.length-1));
+  const working = clone(ship);
+  working.holds[idx] = {...working.holds[idx], stowage_length_m: Number(len)||0};
+  currentShipConfig = clone(working);
+  upsertLocalShip(currentShipConfig);
+}
+function activeFleetShip(){
+  return findShipByName(document.getElementById('shipName').value) || currentShipConfig || null;
+}
+function computeHoldAllocations(commitNext=false){
+  const base = allocationBase();
+  const ship = activeFleetShip();
+  const holds = (ship && ship.holds && ship.holds.length) ? clone(ship.holds) : [{hold_name:document.getElementById('holdName').value || 'Hold 1', hold_length_m:numOrNull(document.getElementById('holdLength').value) || 0, hold_width_m:numOrNull(document.getElementById('holdWidth').value) || 0, coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value) || 0, row_gap_m:numOrNull(document.getElementById('rowGap').value) || 0}];
+  const startIdx = Math.max(0, Math.min(document.getElementById('holdName').selectedIndex >= 0 ? document.getElementById('holdName').selectedIndex : selectedHoldIndex, holds.length-1));
+  const rowGap = numOrNull(document.getElementById('rowGap').value) || 0;
+  const manualLen = numOrNull(document.getElementById('stowageLength').value) || numOrNull(document.getElementById('holdLength').value) || 0;
+  let remaining = base.totalCoils;
+  const allocations = holds.map((h,i) => ({idx:i, name:h.hold_name || `Hold ${i+1}`, length:0, blocks:0, coils:0, tonnes:0, capacity:capacityForHold(h), maxLen:Number(h.hold_length_m || h.length_m || 0)}));
+  if(!(base.totalCoils>0 && base.avgW>0)){ return {allocations, remainingCoils:0, remainingTonnes:0, totalLength:0, totalWeight:0, base}; }
+  for(let i=0; i<allocations.length; i++){
+    const a = allocations[i];
+    const h = holds[i] || {};
+    const maxLen = a.maxLen || (i===startIdx ? numOrNull(document.getElementById('holdLength').value) || 0 : 0);
+    let len;
+    if(i < startIdx){
+      len = Math.max(0, Math.min(maxLen, Number(h.stowage_length_m || 0)));
+    } else if(i === startIdx){
+      len = Math.max(0, Math.min(maxLen || manualLen, manualLen));
+    } else {
+      // v7.0 Allocation Workspace: after the active hold, allocate the remaining cargo automatically.
+      // Do not keep stale saved lengths for following holds; they must follow the marker live.
+      const needBlocks = a.capacity ? Math.ceil(remaining / a.capacity) : 0;
+      len = Math.min(maxLen, lengthForBlocks(needBlocks, base.avgW, rowGap));
+    }
+    const blocks = blocksForLength(len, base.avgW, rowGap);
+    const coils = Math.min(remaining, blocks * (a.capacity || 0));
+    a.length = Number(len.toFixed(2));
+    a.blocks = blocks;
+    a.coils = coils;
+    a.tonnes = coils * base.avgT;
+    remaining = Math.max(0, remaining - coils);
+    if(commitNext && i >= startIdx){
+      holds[i].stowage_length_m = a.length;
+    }
+  }
+  if(commitNext && ship && ship.holds){
+    ship.holds = holds;
+    currentShipConfig = clone(ship);
+    upsertLocalShip(currentShipConfig);
+  }
+  const totalLength = allocations.reduce((s,a)=>s+a.length,0);
+  const totalWeight = allocations.reduce((s,a)=>s+a.tonnes,0);
+  return {allocations, remainingCoils:remaining, remainingTonnes:remaining*base.avgT, totalLength, totalWeight, base};
+}
+function allocationHtml(){
+  const r = computeHoldAllocations(false);
+  if(!r.base.totalCoils || !r.base.avgW) return '<div class="details"><b>Allocation Workspace</b><br>Import cargo and build a plan to see live hold-by-hold length, coils and weight.</div>';
+  const selected = Math.max(0, document.getElementById('holdName').selectedIndex);
+  const remainingClass = r.remainingCoils > 0 ? 'bad' : 'ok';
+  const rows = r.allocations.map(a => `<tr class="${a.idx===selected ? 'activeAllocRow':''}"><td>${a.name}</td><td>${a.length.toFixed(2)} m</td><td>${a.blocks}</td><td>${a.coils}</td><td>${a.tonnes.toFixed(1)} t</td></tr>`).join('');
+  return `<div class="stats" style="margin-bottom:10px">
+      <div class="stat"><b>Total allocated</b><span>${r.totalWeight.toFixed(1)} t</span></div>
+      <div class="stat"><b>Length used</b><span>${r.totalLength.toFixed(2)} m</span></div>
+      <div class="stat"><b>Remaining coils</b><span class="${remainingClass}">${r.remainingCoils}</span></div>
+      <div class="stat"><b>Remaining weight</b><span class="${remainingClass}">${r.remainingTonnes.toFixed(1)} t</span></div>
+    </div>
+    <table><thead><tr><th>Hold</th><th>Length</th><th>Blocks</th><th>Coils</th><th>Weight</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="hint">Move the red marker. Allocation updates live; following holds receive the remaining cargo automatically.</div>`;
+}
+function renderAllocationSummary(){
+  const html = allocationHtml();
+  const box = document.getElementById('allocationPanel');
+  if(box) box.innerHTML = html;
+  const ws = document.getElementById('allocationWorkspace');
+  if(ws) ws.innerHTML = html;
+}
+function commitAllocationToNextHolds({regenerate=false}={}){
+  const len = numOrNull(document.getElementById('stowageLength').value) || 0;
+  persistActiveHoldStowage(len);
+  computeHoldAllocations(true);
+  renderAllocationSummary();
+  updateAllocationHint();
+  if(regenerate) autoGeneratePlan(250);
+}
 function updateAllocationHint(){
   const hint = document.getElementById('allocationHint');
   if(!hint) return;
@@ -676,7 +815,8 @@ function updateAllocationHint(){
   const remTonnes = Math.max(0, lastCargoPreview.total_weight_t - tonnes);
   const remBlocks = cap ? Math.ceil(remCoils / cap) : 0;
   const remLen = remBlocks ? remBlocks * avgW + Math.max(0, remBlocks-1) * rowGap : 0;
-  hint.textContent = `This hold: approx. ${blocks} blocks / ${coils} coils / ${tonnes.toFixed(1)} t. Remaining for next hold: ${remCoils} coils / ${remTonnes.toFixed(1)} t, approx. ${remLen.toFixed(2)} m.`;
+  hint.textContent = `This hold: approx. ${blocks} blocks / ${coils} coils / ${tonnes.toFixed(1)} t. Remaining for next hold: ${remCoils} coils / ${remTonnes.toFixed(1)} t, approx. ${remLen.toFixed(2)} m. Press Enter to commit remaining cargo to next hold(s).`;
+  renderAllocationSummary();
 }
 
 function buildPatternText(){
@@ -712,7 +852,8 @@ function updatePatternUI(){
 stowagePattern.addEventListener('change', updatePatternUI);
 document.getElementById('holdWidth').addEventListener('input', () => { updatePatternUI(); updateAllocationHint(); });
 document.getElementById('holdLength').addEventListener('input', () => { clampStowageLength(); updateAllocationHint(); });
-document.getElementById('stowageLength').addEventListener('input', () => { clampStowageLength(); updateAllocationHint(); });
+document.getElementById('stowageLength').addEventListener('input', () => { clampStowageLength(); updateAllocationHint(); renderAllocationSummary(); });
+document.getElementById('stowageLength').addEventListener('change', () => { commitAllocationToNextHolds({regenerate:true}); });
 document.getElementById('rowGap').addEventListener('input', updateAllocationHint);
 document.getElementById('coilDiameter').addEventListener('input', () => { updatePatternUI(); updateAllocationHint(); });
 customPattern.addEventListener('input', updatePatternUI);
@@ -746,6 +887,14 @@ function selectView(view){
   if(view === '3d'){ draw3DView(lastPlanData); threeDSvg.style.display = 'block'; threeDNote.style.display = 'block'; }
 }
 viewTabs.forEach(b => b.addEventListener('click', () => selectView(b.dataset.view)));
+document.addEventListener('keydown', (evt) => {
+  if(evt.key === 'Enter' && lastPlanData && currentView === 'top'){
+    const tag = String((evt.target && evt.target.tagName) || '').toLowerCase();
+    if(tag !== 'textarea'){
+      commitAllocationToNextHolds();
+    }
+  }
+});
 
 function drawSectionView(data){
   const coils = data.coils || [];
@@ -844,7 +993,6 @@ function addTooltip(el, c){
   el.appendChild(title);
 }
 
-
 function svgPointFromEvent(svgNode, evt){
   const pt = svgNode.createSVGPoint();
   pt.x = evt.clientX; pt.y = evt.clientY;
@@ -878,9 +1026,11 @@ function updateStowageFromMarker(len, data, liveOnly=false){
   len = Math.max(0, Math.min(holdLen, Number(len)||0));
   const el = document.getElementById('stowageLength');
   el.value = len.toFixed(2);
+  persistActiveHoldStowage(len);
   updateAllocationHint();
   const label = document.getElementById('markerReadout');
   if(label) label.textContent = `Stowage marker: ${len.toFixed(2)} m`;
+  renderAllocationSummary();
 }
 
 function drawInteractivePlan(data){
@@ -919,8 +1069,8 @@ function drawInteractivePlan(data){
   const stowInputLen = numOrNull(document.getElementById('stowageLength').value);
   const activeLen = Math.max(0, Math.min(physicalLen, stowInputLen || Number(hold.stowage_length_m || hold.length_m || 0)));
   if(physicalLen > 0){
-    el('rect', {x:pad, y:pad, width:activeLen*scaleX, height:hold.width_m*scaleY, fill:'#dcfce7', opacity:.42, 'pointer-events':'none'});
-    el('rect', {x:pad+activeLen*scaleX, y:pad, width:Math.max(0,(physicalLen-activeLen)*scaleX), height:hold.width_m*scaleY, fill:'#e5e7eb', opacity:.40, 'pointer-events':'none'});
+    el('rect', {id:'loadedShade', x:pad, y:pad, width:activeLen*scaleX, height:hold.width_m*scaleY, fill:'#dcfce7', opacity:.42, 'pointer-events':'none'});
+    el('rect', {id:'freeShade', x:pad+activeLen*scaleX, y:pad, width:Math.max(0,(physicalLen-activeLen)*scaleX), height:hold.width_m*scaleY, fill:'#e5e7eb', opacity:.40, 'pointer-events':'none'});
   }
 
   // title inside plan
@@ -982,13 +1132,19 @@ function drawInteractivePlan(data){
     markerLine.setAttribute('x1', xNow); markerLine.setAttribute('x2', xNow);
     markerTri.setAttribute('points', `${xNow-16},${pad-28} ${xNow+16},${pad-28} ${xNow},${pad-5}`);
     markerText.setAttribute('x', xNow+8);
+    const loadedShade = document.getElementById('loadedShade');
+    const freeShade = document.getElementById('freeShade');
+    if(loadedShade) loadedShade.setAttribute('width', Math.max(0, markerLen*scaleX));
+    if(freeShade){ freeShade.setAttribute('x', pad+markerLen*scaleX); freeShade.setAttribute('width', Math.max(0,(physicalLen-markerLen)*scaleX)); }
     updateStowageFromMarker(markerLen, data, true);
   }
   let dragging = false;
   markerGroup.addEventListener('pointerdown', evt => { dragging=true; markerGroup.setPointerCapture(evt.pointerId); setMarkerFromEvent(evt); });
   markerGroup.addEventListener('pointermove', evt => { if(dragging) setMarkerFromEvent(evt); });
-  markerGroup.addEventListener('pointerup', evt => { dragging=false; updateStowageFromMarker(markerLen, data, false); });
+  markerGroup.addEventListener('pointerup', evt => { dragging=false; updateStowageFromMarker(markerLen, data, false); commitAllocationToNextHolds({regenerate:false}); });
   markerGroup.addEventListener('pointercancel', () => dragging=false);
+  markerGroup.setAttribute('tabindex','0');
+  markerGroup.addEventListener('keydown', evt => { if(evt.key === 'Enter'){ evt.preventDefault(); commitAllocationToNextHolds({regenerate:false}); renderAllocationSummary(); } });
 
   const key = el('text', {x:pad+10, y:H-18, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
   key.textContent = 'Top View: drag red marker to choose stowage length. Marker snaps to complete blocks; green = loaded, grey = free.';
@@ -1031,6 +1187,7 @@ importBtn.addEventListener('click', async () => {
       <table><thead><tr><th>ID</th><th>Weight t</th><th>Width m</th><th>Diam. m</th></tr></thead><tbody>${rows}</tbody></table>
     `;
     updateAllocationHint();
+    renderAllocationSummary();
   }catch(err){
     cargoPreviewBox.innerHTML = `<div class="details"><b>Error:</b><br>${err.message}</div>`;
   }finally{
@@ -1042,7 +1199,7 @@ importBtn.addEventListener('click', async () => {
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   btn.disabled = true;
-  btn.textContent = 'GENERATING PLAN...';
+  btn.textContent = 'BUILDING PLAN...';
   summaryBox.innerHTML = '<div class="details">Working...</div>';
   weightsBox.innerHTML = '<div class="details">Working...</div>';
 
@@ -1051,6 +1208,7 @@ form.addEventListener('submit', async (e) => {
     const response = await fetch('/calculate', {method:'POST', body:fd});
     const data = await response.json();
     if(!response.ok) throw new Error(data.detail || 'Calculation failed');
+    lastPlanData = data;
 
     summaryBox.innerHTML = `
       <div class="stats">
@@ -1068,6 +1226,7 @@ form.addEventListener('submit', async (e) => {
         <a href="${data.pdf_url}" target="_blank">PDF</a>
         <a href="${data.csv_url}" target="_blank">CSV</a>
       </div>
+      <div id="allocationPanel">${allocationHtml()}</div>
     `;
 
     const rows = (data.block_weights || []).map(r => `
@@ -1081,12 +1240,13 @@ form.addEventListener('submit', async (e) => {
     `;
     coilDetails.innerHTML = 'Click a coil in the plan to inspect ID, weight and position.';
     drawInteractivePlan(data);
+    renderAllocationSummary();
 
   } catch(err) {
     summaryBox.innerHTML = `<div class="details"><b>Error:</b><br>${err.message}</div>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'GENERATE PLAN';
+    btn.textContent = 'BUILD / REFRESH PLAN';
   }
 });
 
