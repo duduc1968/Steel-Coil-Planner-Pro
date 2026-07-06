@@ -1,15 +1,18 @@
-# Steel Coil Planner Pro v4.8
+# Steel Coil Planner Pro v4.9
 
-Updates:
-- Automatic bottom-coil count from hold width and planning diameter.
-- Automatic central gap calculation.
-- Automatic wedge recommendation: if gap > 1/3 diameter, two wedge coils are used in Auto Width / Wedge mode.
-- Upper tier contact rule: upper coils are one fewer than the supporting bottom group and sit in the valleys between bottom coils.
-- Fleet/Ship Library upgraded to save one ship with multiple holds.
-- Ship Library save/load/delete corrected for persistent ship characteristics.
+## Fleet Library Save Fix
 
-Recommended test:
-1. Select Auto width / wedge.
-2. Set hold width and diameter.
-3. Import cargo and Generate Plan.
-4. Open Ship Library, create Hold 1 / Hold 2, Save Ship, Refresh, reload.
+This build fixes the Ship/Fleet Library selection and persistence workflow.
+
+### Changes
+- Selecting a saved ship now loads the saved ship object, not the current Voyage Setup values.
+- Saved ships with multiple holds are restored with all hold characteristics.
+- Hold selector updates the form immediately with the saved hold values.
+- Saving an existing ship updates the same saved file; if the ship is renamed, the old file is removed.
+- Load Hold to Voyage Setup copies the selected saved hold exactly as stored.
+
+### Previous v4.8 features retained
+- Auto calculation of bottom coils by hold width and planning diameter.
+- Auto central gap calculation.
+- 2 wedge coils recommended when the central gap is greater than one third of the planning diameter.
+- Multiple holds per vessel.

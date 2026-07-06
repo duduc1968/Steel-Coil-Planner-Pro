@@ -89,17 +89,25 @@ def list_ships():
 @app.post('/api/ships')
 async def save_ship(payload: dict):
     import json
-    data = normalize_ship_data(dict(payload))
+    raw = dict(payload)
+    old_file = Path(str(raw.get('_file', ''))).name if raw.get('_file') else None
+    data = normalize_ship_data(raw)
     # validate each hold and keep a clean JSON file
     clean_holds = []
-    for h in data.get('holds', []):
+    for idx, h in enumerate(data.get('holds', [])):
         h = dict(h)
         h['ship_name'] = data.get('ship_name') or h.get('ship_name') or 'Unnamed ship'
+        h.setdefault('hold_name', f'Hold {idx + 1}')
         clean_holds.append(ShipHold(**h).model_dump())
     data = {'ship_name': data.get('ship_name') or clean_holds[0]['ship_name'], 'holds': clean_holds}
-    path = SHIPS / f"{ship_file_name(data['ship_name'])}.json"
-    path.write_text(json.dumps(data, indent=2), encoding='utf-8')
-    return {'status': 'saved', 'ship': data, 'file': path.name}
+    new_path = SHIPS / f"{ship_file_name(data['ship_name'])}.json"
+    # If the user edits an existing ship and changes the name, remove the old JSON file.
+    if old_file:
+        old_path = SHIPS / old_file
+        if old_path.exists() and old_path.name != new_path.name:
+            old_path.unlink()
+    new_path.write_text(json.dumps(data, indent=2), encoding='utf-8')
+    return {'status': 'saved', 'ship': {**data, '_file': new_path.name}, 'file': new_path.name}
 
 @app.delete('/api/ships/{file_name}')
 def delete_ship(file_name: str):
