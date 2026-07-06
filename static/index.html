@@ -92,7 +92,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v4.8 beta · Auto Width + Fleet Library</div>
+    <div class="version">v5.0 beta · Fleet Library Sync Fix</div>
   </header>
 
   <main class="app">
@@ -270,7 +270,7 @@
           <div class="hint">This library saves ship/hold geometry in the app. Load a ship to fill Voyage Setup automatically.</div>
           <div class="modalActions">
             <button class="miniBtn blue" type="button" id="saveShipBtn">SAVE SHIP</button>
-            <button class="miniBtn" type="button" id="loadShipBtn">LOAD HOLD TO VOYAGE SETUP</button>
+            <button class="miniBtn" type="button" id="loadShipBtn">LOAD / SYNC TO VOYAGE SETUP</button>
             <button class="miniBtn" type="button" id="addHoldBtn">ADD HOLD</button>
             <button class="miniBtn" type="button" id="deleteHoldBtn">DELETE HOLD</button>
             <button class="miniBtn" type="button" id="newShipBtn">NEW SHIP</button>
@@ -382,47 +382,93 @@ function fillLibraryForm(config){
   renderHoldSelector();
   fillHoldForm(currentShipConfig.holds[selectedHoldIndex]);
 }
-function applyShipToMainForm(s){
-  const h = s.holds ? s.holds[selectedHoldIndex] : s;
-  const shipName = s.ship_name || h.ship_name;
+function applyShipToMainForm(shipOrHold){
+  // Robust Fleet Library -> Voyage Setup synchronisation.
+  // Always copy the selected hold object into the left Voyage Setup form.
+  const ship = shipOrHold && shipOrHold.holds ? shipOrHold : currentShipConfig;
+  const holds = ship && ship.holds ? ship.holds : [shipOrHold];
+  const h = holds[Math.max(0, Math.min(selectedHoldIndex, holds.length - 1))] || holds[0] || {};
+  const shipName = (ship && ship.ship_name) || h.ship_name || document.getElementById('libShipName').value || 'Unnamed ship';
   let shipSelect = document.getElementById('shipName');
   if(![...shipSelect.options].some(o => o.value === shipName || o.text === shipName)){ shipSelect.add(new Option(shipName, shipName)); }
   shipSelect.value = shipName;
-  setVal('holdName', h.hold_name || 'Hold 1'); setVal('holdWidth', h.hold_width_m); setVal('holdLength', h.hold_length_m);
-  setVal('coilDiameter', h.coil_diameter_m ?? 1.8); setVal('rowGap', h.row_gap_m ?? 0.15); setVal('centerGap', h.center_gap_m ?? 0);
-  setVal('maxStackHeight', h.max_stack_height_m); setVal('tankTopLimit', h.tank_top_limit_t_m2);
-  if(h.stowage_pattern){ stowagePattern.value = h.stowage_pattern; updatePatternUI(); }
-  updateAutoWidthFields();
+
+  setVal('holdName', h.hold_name || `Hold ${selectedHoldIndex + 1}`);
+  setVal('holdWidth', h.hold_width_m ?? 11.5);
+  setVal('holdLength', h.hold_length_m ?? 20);
+  setVal('coilDiameter', h.coil_diameter_m ?? 1.8);
+  setVal('rowGap', h.row_gap_m ?? 0.15);
+  setVal('centerGap', h.center_gap_m ?? 0);
+  setVal('maxStackHeight', h.max_stack_height_m);
+  setVal('tankTopLimit', h.tank_top_limit_t_m2);
+
+  // Keep extra library fields available for future reports/geometry, even if they are not visible in Voyage Setup yet.
+  document.getElementById('form').dataset.shipConfig = JSON.stringify({ship_name: shipName, hold: h});
+
+  if(h.stowage_pattern){ stowagePattern.value = h.stowage_pattern; }
+  updatePatternUI();
+  ['shipName','holdName','holdWidth','holdLength','coilDiameter','rowGap','centerGap','maxStackHeight','tankTopLimit'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.dispatchEvent(new Event('change', {bubbles:true}));
+  });
+  return h;
 }
-async function refreshShipLibrary(){
+function voyageSetupAsShip(){
+  const name = document.getElementById('shipName').value || 'Unnamed ship';
+  return {ship_name:name, holds:[{ship_name:name, hold_name:document.getElementById('holdName').value || 'Hold 1', hold_length_m:numOrNull(document.getElementById('holdLength').value), hold_width_m:numOrNull(document.getElementById('holdWidth').value), coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value), row_gap_m:numOrNull(document.getElementById('rowGap').value), center_gap_m:numOrNull(document.getElementById('centerGap').value), max_stack_height_m:numOrNull(document.getElementById('maxStackHeight').value), tank_top_limit_t_m2:numOrNull(document.getElementById('tankTopLimit').value), stowage_pattern:stowagePattern.value}]};
+}
+function selectSavedShip(s, holdIndex=0){
+  selectedShipFile = s._file || selectedShipFile;
+  selectedHoldIndex = Math.max(0, Math.min(holdIndex, ((s.holds || []).length || 1) - 1));
+  fillLibraryForm(JSON.parse(JSON.stringify(s)));
+  const h = applyShipToMainForm(currentShipConfig);
+  shipListBox.querySelectorAll('.shipItem').forEach(x=>x.classList.toggle('active', x.dataset.file === selectedShipFile));
+  shipLibraryStatus.textContent = `Loaded to Voyage Setup: ${currentShipConfig.ship_name || 'Unnamed ship'} - ${h.hold_name || 'Hold 1'}`;
+}
+async function refreshShipLibrary({keepSelection=true} = {}){
   shipListBox.innerHTML = 'Loading...';
-  const r = await fetch('/api/ships'); const data = await r.json(); savedShips = data.ships || [];
+  const r = await fetch('/api/ships', {cache:'no-store'}); const data = await r.json(); savedShips = data.ships || [];
   if(!savedShips.length){ shipListBox.innerHTML = '<div class="details">No saved ships yet.</div>'; return; }
-  shipListBox.innerHTML = savedShips.map((s,i)=>`<div class="shipItem ${s._file===selectedShipFile?'active':''}" data-i="${i}"><b>${s.ship_name || 'Unnamed ship'}</b><span>${(s.holds||[]).length} hold(s)</span></div>`).join('');
+  shipListBox.innerHTML = savedShips.map((s,i)=>`<div class="shipItem ${s._file===selectedShipFile?'active':''}" data-i="${i}" data-file="${s._file || ''}"><b>${s.ship_name || 'Unnamed ship'}</b><span>${(s.holds||[]).length} hold(s)</span></div>`).join('');
   shipListBox.querySelectorAll('.shipItem').forEach(item => item.addEventListener('click', () => {
-    const s = savedShips[Number(item.dataset.i)]; selectedShipFile = s._file; selectedHoldIndex = 0; fillLibraryForm(s);
-    shipListBox.querySelectorAll('.shipItem').forEach(x=>x.classList.remove('active')); item.classList.add('active');
-    shipLibraryStatus.textContent = `Selected: ${s.ship_name}`;
+    const s = savedShips[Number(item.dataset.i)];
+    selectSavedShip(s, 0);
   }));
+  if(keepSelection && selectedShipFile){
+    const active = savedShips.find(s => s._file === selectedShipFile);
+    if(active) selectSavedShip(active, selectedHoldIndex);
+  }
 }
 shipLibraryTool.addEventListener('click', async () => {
-  shipModal.style.display = 'flex'; selectedHoldIndex = 0;
-  fillLibraryForm({ship_name:document.getElementById('shipName').value, holds:[{ship_name:document.getElementById('shipName').value, hold_name:document.getElementById('holdName').value, hold_length_m:numOrNull(document.getElementById('holdLength').value), hold_width_m:numOrNull(document.getElementById('holdWidth').value), coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value), row_gap_m:numOrNull(document.getElementById('rowGap').value), center_gap_m:numOrNull(document.getElementById('centerGap').value), max_stack_height_m:numOrNull(document.getElementById('maxStackHeight').value), tank_top_limit_t_m2:numOrNull(document.getElementById('tankTopLimit').value), stowage_pattern:stowagePattern.value}]});
-  await refreshShipLibrary();
+  shipModal.style.display = 'flex';
+  if(!selectedShipFile){ selectedHoldIndex = 0; fillLibraryForm(voyageSetupAsShip()); }
+  await refreshShipLibrary({keepSelection:true});
 });
 closeShipModal.addEventListener('click', () => shipModal.style.display = 'none');
 document.getElementById('refreshShips').addEventListener('click', refreshShipLibrary);
-libHoldSelector.addEventListener('change', () => { syncCurrentHoldFromForm(); selectedHoldIndex = Number(libHoldSelector.value); fillHoldForm(currentShipConfig.holds[selectedHoldIndex]); });
+libHoldSelector.addEventListener('change', () => {
+  syncCurrentHoldFromForm();
+  selectedHoldIndex = Number(libHoldSelector.value);
+  fillHoldForm(currentShipConfig.holds[selectedHoldIndex]);
+  const h = applyShipToMainForm(currentShipConfig);
+  shipLibraryStatus.textContent = `Loaded to Voyage Setup: ${currentShipConfig.ship_name || 'Unnamed ship'} - ${h.hold_name || 'Hold ' + (selectedHoldIndex+1)}`;
+});
 document.getElementById('addHoldBtn').addEventListener('click', () => { syncCurrentHoldFromForm(); selectedHoldIndex = currentShipConfig.holds.length; currentShipConfig.holds.push({...currentShipConfig.holds[0], hold_name:`Hold ${selectedHoldIndex+1}`}); renderHoldSelector(); fillHoldForm(currentShipConfig.holds[selectedHoldIndex]); shipLibraryStatus.textContent='Hold added. Press SAVE SHIP.'; });
 document.getElementById('deleteHoldBtn').addEventListener('click', () => { if((currentShipConfig.holds||[]).length<=1){ shipLibraryStatus.textContent='A ship must have at least one hold.'; return; } currentShipConfig.holds.splice(selectedHoldIndex,1); selectedHoldIndex=0; renderHoldSelector(); fillHoldForm(currentShipConfig.holds[0]); shipLibraryStatus.textContent='Hold removed. Press SAVE SHIP.'; });
 document.getElementById('newShipBtn').addEventListener('click', () => { selectedShipFile = null; selectedHoldIndex=0; fillLibraryForm({ship_name:'New ship', holds:[{ship_name:'New ship', hold_name:'Hold 1', hold_length_m:20, hold_width_m:11.5, coil_diameter_m:1.8, row_gap_m:0.15, center_gap_m:0, stowage_pattern:'auto_width_wedge'}]}); shipLibraryStatus.textContent='New ship template.'; });
 document.getElementById('saveShipBtn').addEventListener('click', async () => {
   const ship = getShipFromLibraryForm();
+  if(selectedShipFile) ship._file = selectedShipFile;
   const r = await fetch('/api/ships', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(ship)});
   const data = await r.json(); if(!r.ok){ shipLibraryStatus.textContent = data.detail || 'Save failed'; return; }
-  selectedShipFile = data.file; currentShipConfig = data.ship; shipLibraryStatus.textContent = `Saved: ${ship.ship_name} (${ship.holds.length} hold(s))`; await refreshShipLibrary();
+  selectedShipFile = data.file; currentShipConfig = data.ship; applyShipToMainForm(currentShipConfig); shipLibraryStatus.textContent = `Saved and loaded to Voyage Setup: ${ship.ship_name} (${ship.holds.length} hold(s))`; await refreshShipLibrary();
 });
-document.getElementById('loadShipBtn').addEventListener('click', () => { const ship = getShipFromLibraryForm(); applyShipToMainForm(ship); shipModal.style.display = 'none'; });
+document.getElementById('loadShipBtn').addEventListener('click', () => {
+  const ship = getShipFromLibraryForm();
+  const h = applyShipToMainForm(ship);
+  shipLibraryStatus.textContent = `Loaded to Voyage Setup: ${ship.ship_name || 'Unnamed ship'} - ${h.hold_name || 'Hold 1'}`;
+  shipModal.style.display = 'none';
+});
 document.getElementById('deleteShipBtn').addEventListener('click', async () => {
   if(!selectedShipFile){ shipLibraryStatus.textContent = 'Select a ship first.'; return; }
   const r = await fetch('/api/ships/' + encodeURIComponent(selectedShipFile), {method:'DELETE'}); const data = await r.json();
