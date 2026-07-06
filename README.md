@@ -1,4 +1,4 @@
-# Steel Coil Planner Pro v6.1 – Visible Drag Marker
+# Steel Coil Planner Pro v6.2 – Allocation Summary
 
 Updates:
 - Added a clearly visible red drag marker in Top View.
