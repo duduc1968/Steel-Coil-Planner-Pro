@@ -1,18 +1,29 @@
-# Steel Coil Planner Pro v5.3 - Auto Fleet Dropdown Sync
+# Steel Coil Planner Pro v6.0 – Interactive Hold Planning
 
-Changes:
-- Voyage Setup now uses Ship and Hold dropdowns.
-- Changing the Hold dropdown in Voyage Setup automatically loads the saved hold geometry from Fleet/Ship Library.
-- Changing the Ship dropdown automatically refreshes the available holds.
-- Fleet Library no longer requires manual sync for normal use.
-- Sync button remains as a fallback, but selection is now automatic.
-- Pointer cursor added to interactive UI elements.
-- Keeps v4.8/v5.x auto-width wedge logic and upper-tier contact rule.
+New in v6.0:
 
-Recommended test:
-1. Open Ship Library.
-2. Select/create a ship with Hold 1 and Hold 2 using different length/width/diameter values.
-3. Save Ship.
-4. Close Ship Library.
-5. In Voyage Setup, change Hold from the dropdown.
-6. Confirm Width, Length, Diameter, Row gap and Central gap update automatically.
+- Interactive Top View stowage marker.
+- Drag the red marker to select the stowage length used in the selected hold.
+- Marker snaps to complete block ends, so partial blocks are avoided.
+- Green area = planned/loaded length; grey area = free length.
+- Stowage Length field updates automatically from the marker.
+- Cargo allocation hint recalculates remaining coils, tonnes and approximate length for the next hold.
+- Diameter is detected from cargo list when available; otherwise use Average diameter manually.
+
+Workflow:
+
+1. Select ship and hold.
+2. Import cargo.
+3. Generate plan.
+4. In Top View, drag the red marker to the desired end of stowage.
+5. Click Generate Plan again to rebuild the plan using the selected stowage length.
+
+# Steel Coil Planner Pro v5.4
+
+Updates:
+- Cargo list Diameter is detected automatically when available.
+- If Diameter is present, the app uses cargo average diameter for planning and updates the Average Diameter field.
+- If Diameter is not present, the user can enter Average Diameter manually.
+- Added manual stowage length per selected hold.
+- Cargo allocation estimate shows approximate coils/tonnes in selected hold and remaining cargo for the next hold.
+- Fleet Library dropdown sync retained from v5.3.

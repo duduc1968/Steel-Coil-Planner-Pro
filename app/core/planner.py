@@ -89,12 +89,12 @@ def make_plan(cargo_df: pd.DataFrame, cfg: dict):
 
     if "Diameter" in cargo.columns and cargo["Diameter"].notna().any():
         cargo["Diameter_m"] = _series_to_m(cargo["Diameter"], "diameter")
-        planning_diameter = float(cargo["Diameter_m"].max())
+        planning_diameter = float(cargo["Diameter_m"].mean())
     else:
         planning_diameter = float(cfg["coil_diameter_m"])
         cargo["Diameter_m"] = planning_diameter
 
-    # v4.0 planning rule: use largest diameter for safe geometry and load heavier/wider coils first.
+    # v5.4 planning rule: if Diameter is available, use cargo average diameter for width/gap planning; otherwise use manual average diameter.
     cargo = cargo.sort_values(["Diameter_m", "Weight_t", "Width_m"], ascending=[False, False, False]).reset_index(drop=True)
 
     cfg["planning_diameter_m"] = planning_diameter

@@ -45,6 +45,7 @@ class ShipHold(BaseModel):
     hatch_opening_width_m: float | None = None
     frame_spacing_m: float | None = None
     coil_diameter_m: float = 1.8
+    stowage_length_m: float | None = None
     row_gap_m: float = 0.15
     center_gap_m: float = 0.70
     stowage_pattern: str = "auto_width_wedge"
@@ -150,7 +151,10 @@ async def import_cargo(cargo_file: UploadFile = File(...)):
             "coil_count": int(len(cargo)),
             "total_weight_t": float(cargo["Weight_t"].sum()),
             "max_width_m": float(cargo["Width_m"].max()),
+            "avg_width_m": float(cargo["Width_m"].mean()),
+            "avg_weight_t": float(cargo["Weight_t"].mean()),
             "max_diameter_m": float(cargo["Diameter_m"].max()) if "Diameter_m" in cargo.columns else None,
+            "avg_diameter_m": float(cargo["Diameter_m"].mean()) if "Diameter_m" in cargo.columns else None,
             "coils": rows,
         }
     except HTTPException:
@@ -169,6 +173,7 @@ async def calculate(
     max_stack_height_m: str = Form(""),
     tank_top_limit_t_m2: str = Form(""),
     center_gap_m: str = Form("0.70"),
+    stowage_length_m: str = Form(""),
     stowage_pattern: str = Form("raahe_3_3_wedge_4"),
     custom_pattern: str = Form(""),
     builder_pattern: str = Form(""),
@@ -190,7 +195,9 @@ async def calculate(
             "ship_name": ship_name,
             "hold_name": hold_name,
             "hold_width_m": to_float(hold_width_m),
-            "hold_length_m": to_float(hold_length_m),
+            "physical_hold_length_m": to_float(hold_length_m),
+            "hold_length_m": to_float(stowage_length_m) if str(stowage_length_m).strip() else to_float(hold_length_m),
+            "stowage_length_m": to_float(stowage_length_m) if str(stowage_length_m).strip() else to_float(hold_length_m),
             "coil_diameter_m": to_float(coil_diameter_m),
             "row_gap_m": to_float(row_gap_m),
             "max_stack_height_m": to_float(max_stack_height_m) if str(max_stack_height_m).strip() else None,
@@ -215,6 +222,8 @@ async def calculate(
             "hold": {
                 "width_m": cfg["hold_width_m"],
                 "length_m": cfg["hold_length_m"],
+                "physical_length_m": cfg.get("physical_hold_length_m", cfg["hold_length_m"]),
+                "stowage_length_m": cfg.get("stowage_length_m", cfg["hold_length_m"]),
                 "diameter_m": cfg.get("planning_diameter_m", cfg["coil_diameter_m"]),
                 "row_gap_m": cfg["row_gap_m"],
                 "center_gap_m": cfg.get("center_gap_m", 0.0),

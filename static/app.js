@@ -40,6 +40,7 @@ let currentShipConfig = {ship_name:'Default coaster', holds:[]};
 let selectedHoldIndex = 0;
 const libHoldSelector = document.getElementById('libHoldSelector');
 let applyingVoyageSync = false;
+let lastCargoPreview = null;
 
 // v5.2: keep the Fleet Library in the browser as well as on the server.
 // This prevents saved ship/hold data from being lost or reloaded with defaults after deploy/cache refresh.
@@ -199,6 +200,7 @@ function applyShipToMainForm(shipOrHold){
 
     setVal('holdWidth', h.hold_width_m ?? 11.5);
     setVal('holdLength', h.hold_length_m ?? 20);
+    setVal('stowageLength', h.stowage_length_m ?? h.hold_length_m ?? 20);
     setVal('coilDiameter', h.coil_diameter_m ?? 1.8);
     setVal('rowGap', h.row_gap_m ?? 0.15);
     setVal('centerGap', h.center_gap_m ?? 0);
@@ -208,7 +210,7 @@ function applyShipToMainForm(shipOrHold){
     document.getElementById('form').dataset.shipConfig = JSON.stringify({ship_name: shipName, hold: h, hold_index:selectedHoldIndex});
     if(h.stowage_pattern){ stowagePattern.value = h.stowage_pattern; }
     updatePatternUI();
-    ['holdWidth','holdLength','coilDiameter','rowGap','centerGap','maxStackHeight','tankTopLimit'].forEach(id => {
+    ['holdWidth','holdLength','stowageLength','coilDiameter','rowGap','centerGap','maxStackHeight','tankTopLimit'].forEach(id => {
       const el = document.getElementById(id);
       if(el){
         el.dispatchEvent(new Event('input', {bubbles:true}));
@@ -225,7 +227,7 @@ function applyShipToMainForm(shipOrHold){
 function voyageSetupAsShip(){
   const name = document.getElementById('shipName').value || 'Unnamed ship';
   const holdNameValue = document.getElementById('holdName').value || 'Hold 1';
-  return {ship_name:name, holds:[{ship_name:name, hold_name:holdNameValue, hold_length_m:numOrNull(document.getElementById('holdLength').value), hold_width_m:numOrNull(document.getElementById('holdWidth').value), coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value), row_gap_m:numOrNull(document.getElementById('rowGap').value), center_gap_m:numOrNull(document.getElementById('centerGap').value), max_stack_height_m:numOrNull(document.getElementById('maxStackHeight').value), tank_top_limit_t_m2:numOrNull(document.getElementById('tankTopLimit').value), stowage_pattern:stowagePattern.value}]};
+  return {ship_name:name, holds:[{ship_name:name, hold_name:holdNameValue, hold_length_m:numOrNull(document.getElementById('holdLength').value), stowage_length_m:numOrNull(document.getElementById('stowageLength').value), hold_width_m:numOrNull(document.getElementById('holdWidth').value), coil_diameter_m:numOrNull(document.getElementById('coilDiameter').value), row_gap_m:numOrNull(document.getElementById('rowGap').value), center_gap_m:numOrNull(document.getElementById('centerGap').value), max_stack_height_m:numOrNull(document.getElementById('maxStackHeight').value), tank_top_limit_t_m2:numOrNull(document.getElementById('tankTopLimit').value), stowage_pattern:stowagePattern.value}]};
 }
 function selectSavedShip(s, holdIndex=0){
   selectedShipFile = s._file || selectedShipFile;
@@ -336,6 +338,53 @@ function updateAutoWidthFields(){
     }
   }
 }
+
+function clampStowageLength(){
+  const holdLen = numOrNull(document.getElementById('holdLength').value) || 0;
+  const el = document.getElementById('stowageLength');
+  let stowLen = numOrNull(el.value);
+  if(stowLen === null || stowLen <= 0){ return; }
+  if(holdLen > 0 && stowLen > holdLen){ el.value = holdLen.toFixed(2); }
+}
+function estimatePatternCapacity(){
+  const W = numOrNull(document.getElementById('holdWidth').value) || 0;
+  const D = numOrNull(document.getElementById('coilDiameter').value) || 0;
+  if(!(W>0 && D>0)) return 0;
+  let bottom = Math.floor(W / D + 1e-9);
+  let gap = W - bottom * D;
+  if(gap < 0){ bottom = Math.max(0, bottom-1); gap = W - bottom * D; }
+  const port = Math.ceil(bottom / 2), stbd = bottom - port;
+  const upper = Math.max(port-1,0) + Math.max(stbd-1,0);
+  const wedgeCount = gap > D/3 ? 2 : 1;
+  return bottom + upper + wedgeCount;
+}
+function updateAllocationHint(){
+  const hint = document.getElementById('allocationHint');
+  if(!hint) return;
+  const holdLen = numOrNull(document.getElementById('holdLength').value) || 0;
+  const stowLen = numOrNull(document.getElementById('stowageLength').value) || holdLen;
+  const rowGap = numOrNull(document.getElementById('rowGap').value) || 0;
+  const cap = estimatePatternCapacity();
+  if(!lastCargoPreview){
+    hint.textContent = `Use stowage length: ${stowLen.toFixed(2)} m of ${holdLen.toFixed(2)} m. Import cargo to estimate coils/tonnes and remaining cargo for the next hold.`;
+    return;
+  }
+  const avgW = Number(lastCargoPreview.avg_width_m || lastCargoPreview.max_width_m || 0);
+  const avgT = Number(lastCargoPreview.avg_weight_t || (lastCargoPreview.total_weight_t / Math.max(lastCargoPreview.coil_count,1)) || 0);
+  if(!(avgW>0 && cap>0)){
+    hint.textContent = `Use stowage length: ${stowLen.toFixed(2)} m of ${holdLen.toFixed(2)} m.`;
+    return;
+  }
+  const blocks = Math.max(0, Math.floor((stowLen + rowGap) / (avgW + rowGap)));
+  const coils = Math.min(lastCargoPreview.coil_count, blocks * cap);
+  const tonnes = coils * avgT;
+  const remCoils = Math.max(0, lastCargoPreview.coil_count - coils);
+  const remTonnes = Math.max(0, lastCargoPreview.total_weight_t - tonnes);
+  const remBlocks = cap ? Math.ceil(remCoils / cap) : 0;
+  const remLen = remBlocks ? remBlocks * avgW + Math.max(0, remBlocks-1) * rowGap : 0;
+  hint.textContent = `This hold: approx. ${blocks} blocks / ${coils} coils / ${tonnes.toFixed(1)} t. Remaining for next hold: ${remCoils} coils / ${remTonnes.toFixed(1)} t, approx. ${remLen.toFixed(2)} m.`;
+}
+
 function buildPatternText(){
   const p = parseInt(builderPort.value || '0', 10);
   const s = parseInt(builderStbd.value || '0', 10);
@@ -364,10 +413,14 @@ function updatePatternUI(){
   if(isCustom) activePatternTool.textContent = customPattern.value || 'Custom / Manual';
   else if(isBuilder) activePatternTool.textContent = built;
   else activePatternTool.textContent = stowagePattern.options[stowagePattern.selectedIndex].text;
+  updateAllocationHint();
 }
 stowagePattern.addEventListener('change', updatePatternUI);
-document.getElementById('holdWidth').addEventListener('input', updatePatternUI);
-document.getElementById('coilDiameter').addEventListener('input', updatePatternUI);
+document.getElementById('holdWidth').addEventListener('input', () => { updatePatternUI(); updateAllocationHint(); });
+document.getElementById('holdLength').addEventListener('input', () => { clampStowageLength(); updateAllocationHint(); });
+document.getElementById('stowageLength').addEventListener('input', () => { clampStowageLength(); updateAllocationHint(); });
+document.getElementById('rowGap').addEventListener('input', updateAllocationHint);
+document.getElementById('coilDiameter').addEventListener('input', () => { updatePatternUI(); updateAllocationHint(); });
 customPattern.addEventListener('input', updatePatternUI);
 [builderPort,builderStbd,builderWedge,builderUpper].forEach(el => el.addEventListener('input', updatePatternUI));
 [builderWedge].forEach(el => el.addEventListener('change', updatePatternUI));
@@ -497,13 +550,51 @@ function addTooltip(el, c){
   el.appendChild(title);
 }
 
+function svgPointFromEvent(svgNode, evt){
+  const pt = svgNode.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(svgNode.getScreenCTM().inverse());
+}
+function blockSnapLengths(data){
+  const coils = data.coils || [];
+  const hold = data.hold || {};
+  const physical = Number(hold.physical_length_m || hold.length_m || 0);
+  const ends = [...new Set(coils.map(c => Number(c.block_x1_m || c.x1_m || 0)).filter(v => v>0 && v<=physical+1e-9).map(v => Number(v.toFixed(3))))].sort((a,b)=>a-b);
+  if(!ends.length && lastCargoPreview){
+    const cap = estimatePatternCapacity();
+    const avgW = Number(lastCargoPreview.avg_width_m || lastCargoPreview.max_width_m || 0);
+    const gap = numOrNull(document.getElementById('rowGap').value) || 0;
+    if(cap>0 && avgW>0){
+      let x = avgW, out=[];
+      while(x <= physical + 1e-9){ out.push(Number(x.toFixed(3))); x += avgW + gap; }
+      return out;
+    }
+  }
+  return ends;
+}
+function closestSnap(value, snaps, maxLen){
+  if(!snaps || !snaps.length) return Math.max(0, Math.min(maxLen, value));
+  let best = snaps[0], dist = Math.abs(value - best);
+  for(const s of snaps){ const d = Math.abs(value-s); if(d < dist){ best=s; dist=d; } }
+  return Math.max(0, Math.min(maxLen, best));
+}
+function updateStowageFromMarker(len, data, liveOnly=false){
+  const holdLen = Number((data.hold && (data.hold.physical_length_m || data.hold.length_m)) || numOrNull(document.getElementById('holdLength').value) || 0);
+  len = Math.max(0, Math.min(holdLen, Number(len)||0));
+  const el = document.getElementById('stowageLength');
+  el.value = len.toFixed(2);
+  updateAllocationHint();
+  const label = document.getElementById('markerReadout');
+  if(label) label.textContent = `Stowage marker: ${len.toFixed(2)} m`;
+}
 
 function drawInteractivePlan(data){
   const coils = data.coils || [];
   const hold = data.hold || {length_m:20, width_m:11.5};
   const pad = 45;
   const W = 1000, H = 600;
-  const scaleX = (W - pad*2) / hold.length_m;
+  const physicalPlanLength = Number(hold.physical_length_m || hold.length_m || 20);
+  const scaleX = (W - pad*2) / physicalPlanLength;
   const scaleY = (H - pad*2) / hold.width_m;
 
   svg.innerHTML = '';
@@ -518,19 +609,28 @@ function drawInteractivePlan(data){
   }
 
   // hold rectangle
-  el('rect', {x:pad, y:pad, width:hold.length_m*scaleX, height:hold.width_m*scaleY, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':2, rx:6});
+  el('rect', {x:pad, y:pad, width:physicalPlanLength*scaleX, height:hold.width_m*scaleY, fill:'#ffffff', stroke:'#0f172a', 'stroke-width':2, rx:6});
 
   // grid every 1 m
-  for(let x=0; x<=hold.length_m; x+=1){
+  for(let x=0; x<=physicalPlanLength; x+=1){
     el('line', {x1:pad+x*scaleX, y1:pad, x2:pad+x*scaleX, y2:pad+hold.width_m*scaleY, stroke:'#e2e8f0', 'stroke-width':1});
   }
   for(let y=0; y<=hold.width_m; y+=1){
     el('line', {x1:pad, y1:pad+y*scaleY, x2:pad+hold.length_m*scaleX, y2:pad+y*scaleY, stroke:'#e2e8f0', 'stroke-width':1});
   }
 
+  // loaded/free shading controlled by the stowage marker
+  const physicalLen = Number(hold.physical_length_m || hold.length_m || 0);
+  const stowInputLen = numOrNull(document.getElementById('stowageLength').value);
+  const activeLen = Math.max(0, Math.min(physicalLen, stowInputLen || Number(hold.stowage_length_m || hold.length_m || 0)));
+  if(physicalLen > 0){
+    el('rect', {x:pad, y:pad, width:activeLen*scaleX, height:hold.width_m*scaleY, fill:'#dcfce7', opacity:.42, 'pointer-events':'none'});
+    el('rect', {x:pad+activeLen*scaleX, y:pad, width:Math.max(0,(physicalLen-activeLen)*scaleX), height:hold.width_m*scaleY, fill:'#e5e7eb', opacity:.40, 'pointer-events':'none'});
+  }
+
   // title inside plan
   const title = el('text', {x:pad+10, y:pad-15, fill:'#0f172a', 'font-size':14, 'font-weight':'700'});
-  title.textContent = `Hold ${hold.length_m.toFixed(2)} m × ${hold.width_m.toFixed(2)} m`;
+  title.textContent = `Hold ${physicalPlanLength.toFixed(2)} m × ${hold.width_m.toFixed(2)} m · selected stowage ${Number(document.getElementById('stowageLength').value || hold.stowage_length_m || hold.length_m).toFixed(2)} m`;
 
   coils.forEach(c => {
     const x = pad + c.x0_m * scaleX;
@@ -557,8 +657,41 @@ function drawInteractivePlan(data){
     g.appendChild(text);
   });
 
+  // draggable stowage length marker. It snaps to complete block ends.
+  const snapEnds = blockSnapLengths(data);
+  let markerLen = closestSnap(numOrNull(document.getElementById('stowageLength').value) || Number(hold.stowage_length_m || hold.length_m || 0), snapEnds, physicalLen || hold.length_m);
+  updateStowageFromMarker(markerLen, data, true);
+  const markerX = () => pad + markerLen * scaleX;
+  const markerGroup = el('g', {style:'cursor:ew-resize'});
+  const markerLine = document.createElementNS(ns,'line');
+  Object.entries({x1:markerX(),y1:pad-10,x2:markerX(),y2:pad+hold.width_m*scaleY+10,stroke:'#dc2626','stroke-width':4}).forEach(([k,v])=>markerLine.setAttribute(k,v));
+  markerGroup.appendChild(markerLine);
+  const markerTri = document.createElementNS(ns,'polygon');
+  Object.entries({points:`${markerX()-9},${pad-18} ${markerX()+9},${pad-18} ${markerX()},${pad-4}`,fill:'#dc2626'}).forEach(([k,v])=>markerTri.setAttribute(k,v));
+  markerGroup.appendChild(markerTri);
+  const markerText = document.createElementNS(ns,'text');
+  Object.entries({id:'markerReadout',x:markerX()+8,y:pad+18,fill:'#991b1b','font-size':13,'font-weight':900}).forEach(([k,v])=>markerText.setAttribute(k,v));
+  markerText.textContent = `Stowage marker: ${markerLen.toFixed(2)} m`;
+  markerGroup.appendChild(markerText);
+  svg.appendChild(markerGroup);
+  function setMarkerFromEvent(evt){
+    const pt = svgPointFromEvent(svg, evt);
+    const rawLen = (pt.x - pad) / scaleX;
+    markerLen = closestSnap(rawLen, snapEnds, physicalLen || hold.length_m);
+    const xNow = markerX();
+    markerLine.setAttribute('x1', xNow); markerLine.setAttribute('x2', xNow);
+    markerTri.setAttribute('points', `${xNow-9},${pad-18} ${xNow+9},${pad-18} ${xNow},${pad-4}`);
+    markerText.setAttribute('x', xNow+8);
+    updateStowageFromMarker(markerLen, data, true);
+  }
+  let dragging = false;
+  markerGroup.addEventListener('pointerdown', evt => { dragging=true; markerGroup.setPointerCapture(evt.pointerId); setMarkerFromEvent(evt); });
+  markerGroup.addEventListener('pointermove', evt => { if(dragging) setMarkerFromEvent(evt); });
+  markerGroup.addEventListener('pointerup', evt => { dragging=false; updateStowageFromMarker(markerLen, data, false); });
+  markerGroup.addEventListener('pointercancel', () => dragging=false);
+
   const key = el('text', {x:pad+10, y:H-18, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
-  key.textContent = 'Top View: longitudinal stowage blocks as originally designed. Colors are only subtle tier identification.';
+  key.textContent = 'Top View: drag red marker to choose stowage length. Marker snaps to complete blocks; green = loaded, grey = free.';
 
   lastPlanData = data;
   emptyPlan.style.display = 'none';
@@ -581,13 +714,23 @@ importBtn.addEventListener('click', async () => {
     const response = await fetch('/import-cargo', {method:'POST', body:fd});
     const data = await response.json();
     if(!response.ok) throw new Error(data.detail || 'Import failed');
+    lastCargoPreview = data;
+    const diaHint = document.getElementById('diameterSourceHint');
+    if(data.avg_diameter_m){
+      document.getElementById('coilDiameter').value = Number(data.avg_diameter_m).toFixed(3);
+      if(diaHint) diaHint.textContent = `Diameter source: cargo list average ${Number(data.avg_diameter_m).toFixed(3)} m (max ${Number(data.max_diameter_m).toFixed(3)} m).`;
+      updatePatternUI();
+    } else {
+      if(diaHint) diaHint.textContent = 'No Diameter column found. Enter average diameter manually.';
+    }
     const rows = (data.coils || []).slice(0, 20).map(c => `
       <tr><td>${c.ID}</td><td>${Number(c.Weight_t).toFixed(1)}</td><td>${Number(c.Width_m).toFixed(2)}</td><td>${c.Diameter_m ? Number(c.Diameter_m).toFixed(2) : '-'}</td></tr>
     `).join('');
     cargoPreviewBox.innerHTML = `
-      <div class="details"><b>${data.filename}</b><br>${data.coil_count} coils · ${data.total_weight_t.toFixed(1)} t<br>Max width ${data.max_width_m.toFixed(2)} m${data.max_diameter_m ? ` · Max diameter ${data.max_diameter_m.toFixed(2)} m` : ''}</div>
+      <div class="details"><b>${data.filename}</b><br>${data.coil_count} coils · ${data.total_weight_t.toFixed(1)} t<br>Avg width ${data.avg_width_m.toFixed(2)} m · Max width ${data.max_width_m.toFixed(2)} m${data.avg_diameter_m ? ` · Avg diameter ${data.avg_diameter_m.toFixed(2)} m` : ' · Diameter: manual average required'}</div>
       <table><thead><tr><th>ID</th><th>Weight t</th><th>Width m</th><th>Diam. m</th></tr></thead><tbody>${rows}</tbody></table>
     `;
+    updateAllocationHint();
   }catch(err){
     cargoPreviewBox.innerHTML = `<div class="details"><b>Error:</b><br>${err.message}</div>`;
   }finally{
