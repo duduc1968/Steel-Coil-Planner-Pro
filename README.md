@@ -1,10 +1,19 @@
-# Steel Coil Planner Pro v5.1 – Direct Fleet Sync
+# Next Steps
 
-Fixes Fleet/Ship Library synchronisation by copying the visible selected hold fields directly into Voyage Setup.
+## Immediate
+1. Deploy v0.2 to Render.
+2. Test on iPhone Safari.
+3. Upload a real SSAB Excel list.
+4. Check whether column detection works.
 
-Test:
-1. Open Ship Library.
-2. Select a saved ship.
-3. Select Hold 1 or Hold 2.
-4. Press LOAD / SYNC TO VOYAGE SETUP.
-5. The left Voyage Setup must show the exact same Hold Name, Length, Width, Diameter, Row Gap and Central Gap.
+## Development v0.3
+- Improve SSAB Excel import.
+- Add warning when required columns are missing.
+- Add downloadable Excel report.
+- Improve Raahe geometry to be fully parametric.
+
+## Development v0.4
+- Ship library UI.
+- Pattern library UI.
+- Weight per block and tier.
+- Professional PDF header.
