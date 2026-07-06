@@ -1,19 +1,18 @@
-# Next Steps
+# Steel Coil Planner Pro v5.3 - Auto Fleet Dropdown Sync
 
-## Immediate
-1. Deploy v0.2 to Render.
-2. Test on iPhone Safari.
-3. Upload a real SSAB Excel list.
-4. Check whether column detection works.
+Changes:
+- Voyage Setup now uses Ship and Hold dropdowns.
+- Changing the Hold dropdown in Voyage Setup automatically loads the saved hold geometry from Fleet/Ship Library.
+- Changing the Ship dropdown automatically refreshes the available holds.
+- Fleet Library no longer requires manual sync for normal use.
+- Sync button remains as a fallback, but selection is now automatic.
+- Pointer cursor added to interactive UI elements.
+- Keeps v4.8/v5.x auto-width wedge logic and upper-tier contact rule.
 
-## Development v0.3
-- Improve SSAB Excel import.
-- Add warning when required columns are missing.
-- Add downloadable Excel report.
-- Improve Raahe geometry to be fully parametric.
-
-## Development v0.4
-- Ship library UI.
-- Pattern library UI.
-- Weight per block and tier.
-- Professional PDF header.
+Recommended test:
+1. Open Ship Library.
+2. Select/create a ship with Hold 1 and Hold 2 using different length/width/diameter values.
+3. Save Ship.
+4. Close Ship Library.
+5. In Voyage Setup, change Hold from the dropdown.
+6. Confirm Width, Length, Diameter, Row gap and Central gap update automatically.
