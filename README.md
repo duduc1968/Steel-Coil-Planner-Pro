@@ -1,15 +1,8 @@
-# Steel Coil Planner Pro v6.2 – Allocation Summary
+# Steel Coil Planner Pro v6.3 – Live Allocation Summary
 
-Updates:
-- Added a clearly visible red drag marker in Top View.
-- Marker snaps to complete block ends.
-- Dragging updates Stowage length and allocation estimate.
-- Green shading = loaded length; grey shading = free length.
-- Manual Stowage length input remains available.
-
-Workflow:
-1. Import cargo.
-2. Generate Plan.
-3. Open Top View.
-4. Drag the red marker to choose the stowage length.
-5. Press Generate Plan again to regenerate the plan with the selected length.
+Changes:
+- Drag marker automatically commits stowage length for the active hold.
+- Remaining cargo is allocated to following holds without pressing Generate Plan.
+- Hold dropdown shows each hold's saved allocation when selected.
+- Summary panel shows total allocated length/weight plus length, blocks, coils and weight per hold.
+- Generate Plan is triggered automatically after marker release, Enter, manual length change, or hold change when cargo is loaded.

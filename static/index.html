@@ -54,6 +54,7 @@
     .stat b{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
     .stat span{font-size:18px;font-weight:900}
     .ok{color:var(--green)}.bad{color:var(--red)}
+    .activeAllocRow{background:#13264a;outline:1px solid #60a5fa}
     table{width:100%;border-collapse:collapse;font-size:12px}
     th,td{border-bottom:1px solid #334155;padding:7px;text-align:right}
     th:first-child,td:first-child{text-align:left}
@@ -95,7 +96,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v6.2 beta · Allocation Summary</div>
+    <div class="version">v6.3 beta · Live Allocation Summary</div>
   </header>
 
   <main class="app">
@@ -123,7 +124,7 @@
             <div><label>Stowage length to use m</label><input name="stowage_length_m" id="stowageLength" value="20.0" inputmode="decimal"></div>
             <div><label>Row gap m</label><input name="row_gap_m" id="rowGap" value="0.15" inputmode="decimal"></div>
           </div>
-          <div class="hint" id="allocationHint">Drag the red marker in Top View or type a length. Marker snaps to complete blocks and updates the allocation estimate.</div>
+          <div class="hint" id="allocationHint">Drag the red marker in Top View or type a length. It snaps to complete blocks, auto-allocates remaining cargo to the next hold and refreshes the plan.</div>
 
           <label>Average diameter m</label>
           <input name="coil_diameter_m" id="coilDiameter" value="1.8" inputmode="decimal">
