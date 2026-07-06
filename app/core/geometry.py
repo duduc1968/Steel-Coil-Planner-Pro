@@ -9,6 +9,7 @@ PATTERN_LABELS = {
     "four_center_four": "4 + Center + 4",
     "custom": "Custom / Manual",
     "builder": "Pattern Builder",
+    "auto_width_wedge": "Auto Width / Wedge",
 }
 
 def _check_width(required, W, name):
@@ -90,6 +91,91 @@ def split_with_center_positions(side_n, W, D, gap, name):
     positions.append(("Center", "C1", center_y, z_center))
     return positions
 
+
+
+def _multi_split_centers(group_counts, W, D, gaps):
+    """Centers for bottom coils split into several groups separated by gaps."""
+    r = D / 2
+    required = sum(group_counts) * D + sum(gaps)
+    _check_width(required, W, "+".join(map(str, group_counts)))
+    margin = (W - required) / 2
+    groups = []
+    cursor = margin
+    for idx, n in enumerate(group_counts):
+        group = [cursor + r + i * D for i in range(n)]
+        groups.append(group)
+        cursor += n * D
+        if idx < len(gaps):
+            cursor += gaps[idx]
+    return groups
+
+
+def auto_width_wedge_positions(hold_width_m: float, diameter_m: float):
+    """Automatic cross-section based on hold width and planning diameter.
+
+    Rules:
+    - bottom coils = floor(hold_width / diameter)
+    - central gap = hold_width - bottom*diameter
+    - if gap < 0, remove one bottom coil and recalc gap
+    - if gap > diameter/3, use 2 wedge coils, creating two gaps
+    - otherwise use 1 wedge coil
+    - upper coils are always one fewer than the corresponding bottom group and
+      are placed in the valleys, touching the two bottom coils.
+    """
+    W = float(hold_width_m); D = float(diameter_m); r = D / 2
+    bottom_total = max(1, int(math.floor(W / D + 1e-9)))
+    gap_total = W - bottom_total * D
+    if gap_total < -1e-9:
+        bottom_total = max(1, bottom_total - 1)
+        gap_total = W - bottom_total * D
+    wedge_count = 2 if gap_total > D / 3 else 1
+    z0 = r + 0.20
+    positions = []
+
+    if wedge_count == 1:
+        left_n = (bottom_total + 1) // 2
+        right_n = bottom_total - left_n
+        groups = _multi_split_centers([left_n, right_n], W, D, [gap_total])
+    else:
+        # Split bottom coils into 3 practical groups and divide the free space
+        # into two gaps. The port side receives the extra coil where needed.
+        a = (bottom_total + 2) // 3
+        b = (bottom_total + 1) // 3
+        c = bottom_total - a - b
+        if c <= 0:
+            wedge_count = 1
+            left_n = (bottom_total + 1) // 2
+            right_n = bottom_total - left_n
+            groups = _multi_split_centers([left_n, right_n], W, D, [gap_total])
+        else:
+            groups = _multi_split_centers([a, b, c], W, D, [gap_total / 2, gap_total / 2])
+
+    # bottom labels
+    idx = 1
+    for group in groups:
+        for y in group:
+            positions.append(("Bottom", f"B{idx}", y, z0)); idx += 1
+
+    def valley_z(left_y, right_y):
+        dx = abs(float(right_y) - float(left_y)) / 2
+        if dx >= D:
+            return z0 + math.sqrt(max(D**2 - (D/2)**2, 0))
+        return z0 + math.sqrt(max(D**2 - dx**2, 0))
+
+    # upper in each group
+    uidx = 1
+    for group in groups:
+        for i in range(len(group)-1):
+            positions.append(("Upper", f"U{uidx}", (group[i]+group[i+1])/2, valley_z(group[i], group[i+1])))
+            uidx += 1
+
+    # wedge(s) between groups
+    for wi in range(len(groups)-1):
+        left = groups[wi][-1]
+        right = groups[wi+1][0]
+        positions.append(("Wedge", f"W{wi+1}", (left+right)/2, valley_z(left, right)))
+
+    return positions
 
 def custom_positions(pattern_text: str, hold_width_m: float, diameter_m: float, center_gap_m: float | None = None):
     """Manual pattern parser.
@@ -220,6 +306,8 @@ def positions_for_pattern(pattern: str, hold_width_m: float, diameter_m: float, 
     pattern = pattern or "raahe_3_3_wedge_4"
     W = float(hold_width_m); D = float(diameter_m)
     gap = 0.70 if center_gap_m in [None, ""] else float(center_gap_m)
+    if pattern == "auto_width_wedge":
+        return auto_width_wedge_positions(W, D)
     if pattern == "raahe_3_3_wedge_4":
         return raahe_positions(W, D, gap)
     if pattern == "simple_3_3":

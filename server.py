@@ -47,18 +47,35 @@ class ShipHold(BaseModel):
     coil_diameter_m: float = 1.8
     row_gap_m: float = 0.15
     center_gap_m: float = 0.70
-    stowage_pattern: str = "raahe_3_3_wedge_4"
+    stowage_pattern: str = "auto_width_wedge"
+
+class ShipConfig(BaseModel):
+    ship_name: str = Field(..., min_length=1)
+    holds: list[ShipHold] = Field(default_factory=list)
 
 def ship_file_name(name: str) -> str:
     safe = ''.join(ch if ch.isalnum() or ch in ('-', '_') else '_' for ch in name.strip())
     return safe[:80] or 'ship'
+
+def normalize_ship_data(data: dict) -> dict:
+    # v4.8 library format: one ship with multiple holds.
+    # Legacy v4.2/v4.7 files saved one hold directly; keep them readable.
+    if 'holds' not in data:
+        hold = dict(data)
+        ship_name = hold.get('ship_name', 'Unnamed ship')
+        data = {'ship_name': ship_name, 'holds': [hold]}
+    for h in data.get('holds', []):
+        h.setdefault('ship_name', data.get('ship_name', 'Unnamed ship'))
+        h.setdefault('hold_name', 'Hold 1')
+        h.setdefault('stowage_pattern', 'auto_width_wedge')
+    return data
 
 def load_ship_files():
     import json
     ships = []
     for f in sorted(SHIPS.glob('*.json')):
         try:
-            data = json.loads(f.read_text(encoding='utf-8'))
+            data = normalize_ship_data(json.loads(f.read_text(encoding='utf-8')))
             data['_file'] = f.name
             ships.append(data)
         except Exception:
@@ -70,10 +87,17 @@ def list_ships():
     return {'ships': load_ship_files()}
 
 @app.post('/api/ships')
-def save_ship(ship: ShipHold):
+async def save_ship(payload: dict):
     import json
-    data = ship.model_dump()
-    path = SHIPS / f"{ship_file_name(ship.ship_name)}.json"
+    data = normalize_ship_data(dict(payload))
+    # validate each hold and keep a clean JSON file
+    clean_holds = []
+    for h in data.get('holds', []):
+        h = dict(h)
+        h['ship_name'] = data.get('ship_name') or h.get('ship_name') or 'Unnamed ship'
+        clean_holds.append(ShipHold(**h).model_dump())
+    data = {'ship_name': data.get('ship_name') or clean_holds[0]['ship_name'], 'holds': clean_holds}
+    path = SHIPS / f"{ship_file_name(data['ship_name'])}.json"
     path.write_text(json.dumps(data, indent=2), encoding='utf-8')
     return {'status': 'saved', 'ship': data, 'file': path.name}
 
