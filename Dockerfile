@@ -1,19 +1,16 @@
-ID,Bredd_mm,Weight_kg
-340031A,1050,19570
-344487,1258,24520
-346961,1260,23310
-348719,1132,18815
-350229,1058,18745
-350230,1058,19295
-CMS507B,1174,7520
-CMU843,1229,22080
-CMU844,1229,22170
-CMU847,1229,21970
-347222A,1585,13710
-CMT809,981,7630
-CMT810,981,7620
-340670A,1263,21310
-CMU415,1071,19690
-CMU467,1278,20990
-CMU471,1159,19500
-CMU490,1181,21170
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

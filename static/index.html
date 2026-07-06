@@ -92,7 +92,7 @@
       <div class="mark">SCP</div>
       <div><h1>Steel Coil Planner Pro</h1><span>Interactive cargo planning workspace</span></div>
     </div>
-    <div class="version">v5.0 beta · Fleet Library Sync Fix</div>
+    <div class="version">v5.1 beta · Direct Fleet Sync</div>
   </header>
 
   <main class="app">
@@ -383,12 +383,26 @@ function fillLibraryForm(config){
   fillHoldForm(currentShipConfig.holds[selectedHoldIndex]);
 }
 function applyShipToMainForm(shipOrHold){
-  // Robust Fleet Library -> Voyage Setup synchronisation.
-  // Always copy the selected hold object into the left Voyage Setup form.
-  const ship = shipOrHold && shipOrHold.holds ? shipOrHold : currentShipConfig;
-  const holds = ship && ship.holds ? ship.holds : [shipOrHold];
-  const h = holds[Math.max(0, Math.min(selectedHoldIndex, holds.length - 1))] || holds[0] || {};
-  const shipName = (ship && ship.ship_name) || h.ship_name || document.getElementById('libShipName').value || 'Unnamed ship';
+  // v5.1 direct Fleet Library -> Voyage Setup synchronisation.
+  // Important: when the modal is open, copy the VISIBLE library form values directly.
+  // This avoids stale local state and guarantees that the selected hold appears exactly as saved/edited.
+  let h;
+  let shipName;
+  if(shipModal && shipModal.style.display === 'flex'){
+    h = getHoldFromLibraryForm();
+    shipName = document.getElementById('libShipName').value || (currentShipConfig && currentShipConfig.ship_name) || 'Unnamed ship';
+    if(currentShipConfig){
+      currentShipConfig.ship_name = shipName;
+      if(!currentShipConfig.holds) currentShipConfig.holds = [];
+      currentShipConfig.holds[selectedHoldIndex] = {...h, ship_name: shipName};
+    }
+  } else {
+    const ship = shipOrHold && shipOrHold.holds ? shipOrHold : currentShipConfig;
+    const holds = ship && ship.holds ? ship.holds : [shipOrHold];
+    h = holds[Math.max(0, Math.min(selectedHoldIndex, holds.length - 1))] || holds[0] || {};
+    shipName = (ship && ship.ship_name) || h.ship_name || 'Unnamed ship';
+  }
+
   let shipSelect = document.getElementById('shipName');
   if(![...shipSelect.options].some(o => o.value === shipName || o.text === shipName)){ shipSelect.add(new Option(shipName, shipName)); }
   shipSelect.value = shipName;
@@ -402,14 +416,16 @@ function applyShipToMainForm(shipOrHold){
   setVal('maxStackHeight', h.max_stack_height_m);
   setVal('tankTopLimit', h.tank_top_limit_t_m2);
 
-  // Keep extra library fields available for future reports/geometry, even if they are not visible in Voyage Setup yet.
   document.getElementById('form').dataset.shipConfig = JSON.stringify({ship_name: shipName, hold: h});
 
   if(h.stowage_pattern){ stowagePattern.value = h.stowage_pattern; }
   updatePatternUI();
   ['shipName','holdName','holdWidth','holdLength','coilDiameter','rowGap','centerGap','maxStackHeight','tankTopLimit'].forEach(id => {
     const el = document.getElementById(id);
-    if(el) el.dispatchEvent(new Event('change', {bubbles:true}));
+    if(el){
+      el.dispatchEvent(new Event('input', {bubbles:true}));
+      el.dispatchEvent(new Event('change', {bubbles:true}));
+    }
   });
   return h;
 }
@@ -466,7 +482,7 @@ document.getElementById('saveShipBtn').addEventListener('click', async () => {
 document.getElementById('loadShipBtn').addEventListener('click', () => {
   const ship = getShipFromLibraryForm();
   const h = applyShipToMainForm(ship);
-  shipLibraryStatus.textContent = `Loaded to Voyage Setup: ${ship.ship_name || 'Unnamed ship'} - ${h.hold_name || 'Hold 1'}`;
+  shipLibraryStatus.textContent = `SYNCED: ${ship.ship_name || 'Unnamed ship'} - ${h.hold_name || 'Hold 1'} (${h.hold_length_m} m x ${h.hold_width_m} m)`;
   shipModal.style.display = 'none';
 });
 document.getElementById('deleteShipBtn').addEventListener('click', async () => {
