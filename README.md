@@ -1,9 +1,14 @@
-# Steel Coil Planner Pro v7.2 – Multi-Hold Workspace
+# Steel Coil Planner Pro v8.0 — Next Architecture
 
-Changes:
-- Shows all holds in one Top View workspace.
-- Each hold has its own independent red drag marker.
-- Dropdown selection only changes the active/focused hold.
-- Marker has no black bounding box.
-- Allocation summary shows total allocated length/weight and per-hold length, blocks, coils and tonnes.
-- Moving a marker updates the allocation live and auto-distributes remaining cargo to following holds.
+This build resets the workspace around a real Multi-Hold Allocation Workspace.
+
+Included:
+- All holds visible on the same page.
+- Independent marker for each hold.
+- Marker can move from 0 m to max hold length.
+- Snap to complete blocks.
+- Live summary per hold: length, blocks, coils, weight.
+- Bottom row remains automatic.
+- Upper row remains manual.
+- Cargo diameter is detected from list when available, otherwise average diameter is manual.
+- Fleet Library persists ships and holds in browser localStorage.
