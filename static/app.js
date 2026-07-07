@@ -332,13 +332,14 @@ function updateAutoWidthFields(){
     let gap = W - bottom * D;
     if(gap < 0){ bottom = Math.max(0,bottom-1); gap = W - bottom * D; }
     const port = Math.ceil(bottom / 2), stbd = bottom - port;
-    const upper = Math.max(port-1,0) + Math.max(stbd-1,0);
+    const recommendedUpper = Math.max(port-1,0) + Math.max(stbd-1,0);
     const wedgeCount = gap > D/3 ? 2 : 1;
     document.getElementById('centerGap').value = gap.toFixed(2);
     const hint = document.getElementById('autoGapHint');
-    if(hint) hint.textContent = `Auto: ${bottom} bottom coils (${port}+${stbd}), central gap ${gap.toFixed(2)} m. ${wedgeCount} wedge coil(s) recommended.`;
+    if(hint) hint.textContent = `Auto bottom row: ${bottom} coils (${port}+${stbd}), central gap ${gap.toFixed(2)} m. ${wedgeCount} wedge coil(s). Upper row stays MANUAL (recommended max support positions: ${recommendedUpper}).`;
     if(stowagePattern.value === 'builder'){
-      builderPort.value = String(port); builderStbd.value = String(stbd); builderUpper.value = String(upper);
+      builderPort.value = String(port); builderStbd.value = String(stbd);
+      // Upper row is intentionally NOT auto-filled. It remains manual.
     }
   }
 }
@@ -350,6 +351,11 @@ function clampStowageLength(){
   if(stowLen === null || stowLen <= 0){ return; }
   if(holdLen > 0 && stowLen > holdLen){ el.value = holdLen.toFixed(2); }
 }
+function manualUpperCount(port, stbd){
+  const val = parseInt(builderUpper && builderUpper.value ? builderUpper.value : '0', 10);
+  if(Number.isFinite(val) && val >= 0) return val;
+  return Math.max(port-1,0) + Math.max(stbd-1,0);
+}
 function estimatePatternCapacity(){
   const W = numOrNull(document.getElementById('holdWidth').value) || 0;
   const D = numOrNull(document.getElementById('coilDiameter').value) || 0;
@@ -358,7 +364,7 @@ function estimatePatternCapacity(){
   let gap = W - bottom * D;
   if(gap < 0){ bottom = Math.max(0, bottom-1); gap = W - bottom * D; }
   const port = Math.ceil(bottom / 2), stbd = bottom - port;
-  const upper = Math.max(port-1,0) + Math.max(stbd-1,0);
+  const upper = manualUpperCount(port, stbd); // MANUAL upper row
   const wedgeCount = gap > D/3 ? 2 : 1;
   return bottom + upper + wedgeCount;
 }
@@ -379,7 +385,7 @@ function capacityForHold(h){
   let gap = W - bottom * D;
   if(gap < 0){ bottom = Math.max(0,bottom-1); gap = W - bottom * D; }
   const port = Math.ceil(bottom / 2), stbd = bottom - port;
-  const upper = Math.max(port-1,0) + Math.max(stbd-1,0);
+  const upper = manualUpperCount(port, stbd); // MANUAL upper row
   const wedgeCount = gap > D/3 ? 2 : 1;
   return bottom + upper + wedgeCount;
 }
@@ -554,10 +560,10 @@ function buildPatternText(){
   const p = parseInt(builderPort.value || '0', 10);
   const s = parseInt(builderStbd.value || '0', 10);
   let u = parseInt(builderUpper.value || '0', 10);
-  // Wedge rule: upper tier is automatically one fewer than bottom on each side.
+  // Upper tier remains MANUAL. Bottom row can be auto-calculated, but upper row is user-controlled.
   if(builderWedge.value === 'yes' && p > 0 && s > 0){
-    u = Math.max(p - 1, 0) + Math.max(s - 1, 0);
-    builderUpper.value = String(u);
+    const maxSupport = Math.max(p - 1, 0) + Math.max(s - 1, 0);
+    if(u > maxSupport){ builderPreview.textContent = `Warning: upper tier ${u} exceeds normal support positions ${maxSupport}.`; }
   }
   let parts = [];
   if(p > 0 && s > 0) parts.push(`${p}+${s}`);
@@ -772,10 +778,12 @@ function drawInteractivePlan(data){
   const selected = Math.max(0, Math.min(document.getElementById('holdName').selectedIndex >= 0 ? document.getElementById('holdName').selectedIndex : selectedHoldIndex, holds.length-1));
   const ns = 'http://www.w3.org/2000/svg';
   const W = 1000, pad = 44;
-  const holdH = 82, gapY = 88;
-  const H = Math.max(600, 90 + holds.length * (holdH + gapY));
+  const holdH = 94, gapY = 104;
+  const H = Math.max(620, 120 + holds.length * (holdH + gapY));
   svg.innerHTML = '';
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.height = `${H}px`;
+  svg.style.minHeight = `${H}px`;
   svg.style.outline = 'none';
   function add(name, attrs, parent=svg){
     const e = document.createElementNS(ns, name);
@@ -876,7 +884,7 @@ function drawInteractivePlan(data){
   });
 
   const key = add('text', {x:pad, y:H-22, fill:'#0f172a', 'font-size':12, 'font-weight':'700'});
-  key.textContent = 'Green = allocated length. Grey = free length. Red marker snaps to complete blocks. Each hold has its own marker.';
+  key.textContent = 'Green = allocated length. Grey = free length. Red marker snaps from 0 m to max hold length. Upper row remains manual.';
   lastPlanData = data;
   emptyPlan.style.display = 'none';
   svg.style.display = currentView === 'top' ? 'block' : 'none';
