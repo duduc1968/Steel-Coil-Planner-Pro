@@ -11,7 +11,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Next architecture · Steel Coil Width Arrangement Engine</span></div></div><div class="ver">v8.4 beta · Width Arrangement Engine</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Foundation · unified geometry rules</span></div></div><div class="ver">v8.5 beta · Foundation Engine</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -49,10 +49,11 @@ function n(v,d=0){const x=parseFloat(String(v).replace(',','.'));return Number.i
 function renderSelectors(){shipSelect.innerHTML=fleet.map((s,idx)=>`<option value="${idx}">${s.name}</option>`).join('');shipSelect.value=activeShip;holdSelect.innerHTML=ship().holds.map((h,idx)=>`<option value="${idx}">${h.name}</option>`).join('');holdSelect.value=activeHold;syncSideFromHold()}
 function syncSideFromHold(){const h=hold();holdWidth.value=n(h.width,11.5);holdLength.value=n(h.length,48);if(!cargo.avgDiameter)avgDiameter.value=n(h.diameter,1.8);rowGap.value=n(h.rowGap,.15)}
 function patternForHold(h){const D=dia(), W=n(h.width,11.5);let port,stbd,total,gap;if(bottomMode==='auto'){total=Math.max(1,Math.floor(W/D));gap=W-total*D;if(gap<0){total=Math.max(0,total-1);gap=W-total*D}port=Math.ceil(total/2);stbd=Math.floor(total/2);centralGap.value=gap.toFixed(2)}else{port=i(bottomPort.value,0);stbd=i(bottomStbd.value,0);total=port+stbd;gap=Math.max(0,W-total*D);centralGap.value=gap.toFixed(2)}const rowGapM=n(rowGap.value,.15);let wedge;if(wedgeMode==='auto'){
-  // SCWAE rule restored: one central gap normally gets one wedge.
-  // Two wedges are allowed only when the real central surplus is clearly large enough
-  // to create two working support gaps. The row gap is included as practical tolerance.
-  wedge=(gap>(D/3+rowGapM))?2:1;
+  // SCWAE Foundation rule:
+  // Never create two wedge coils from one central gap.
+  // Auto mode uses one safe central wedge. Two wedges are allowed only in Manual mode
+  // until the engine can prove two separate real support gaps exist.
+  wedge=(total>0 && port>0 && stbd>0)?1:0;
 }else{wedge=i(wedgeCount.value,1)}let upP=i(upperPort.value,0),upS=i(upperStbd.value,0);let coilsPerBlock=total+upP+upS+wedge;return{D,W,port,stbd,total,gap,wedge,upP,upS,rowGapM,coilsPerBlock:Math.max(coilsPerBlock,1)}}
 function maxBlocks(h){return Math.floor(n(h.length,0)/blockLen())}function lengthForBlocks(b){return Math.max(0,b)*blockLen()}function blocksForLength(len,h){return clamp(Math.round(n(len,0)/blockLen()),0,maxBlocks(h))}
 function initAllocations(){ship().holds.forEach(h=>{if(!(h.name in allocations))allocations[h.name]=0})}
