@@ -11,7 +11,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Next architecture · unified geometry workspace</span></div></div><div class="ver">v8.2 beta · Unified Geometry Renderer</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Next architecture · unified geometry workspace</span></div></div><div class="ver">v8.3 beta · Wedge Auto Gap Fix</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -57,11 +57,47 @@ function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.t
 function renderWorkspace(redraw=true){const rows=allocRows();holdsWorkspace.innerHTML=rows.map(holdCard).join('');rows.forEach(r=>{document.getElementById('range_'+r.idx).addEventListener('input',e=>{allocations[r.h.name]=lengthForBlocks(Number(e.target.value));activeHold=r.idx;renderSelectors();recomputeFrom(r.idx)});document.getElementById('card_'+r.idx).addEventListener('click',()=>{activeHold=r.idx;renderSelectors();renderWorkspace()})});renderSummary()}
 function holdCard(r){const maxB=maxBlocks(r.h);const pct=maxB?(r.blocks/maxB*100):0;const loadedBlocks=Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock));return `<div class="hold-card ${r.idx===activeHold?'active':''}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="plan"><div class="rows">${makeRows(r.p,loadedBlocks,maxB)}</div><div class="marker" style="left:calc(10px + (100% - 20px)*${pct/100})"><div class="marker-label">${r.length.toFixed(2)} m | ${r.coils} coils | ${r.weight.toFixed(1)} t</div></div></div><div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}"><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div><div class="section">${sectionSvg(r.p)}</div></div></div>`}
 function makeLaneRow(cls,label,blocks,maxB){let s='<div class="row">';for(let k=0;k<maxB;k++)s+=`<div class="block ${k<blocks?cls:'free'}" style="flex:1">${k<blocks?label:''}</div>`;return s+'</div>'}
-function makeRows(p,blocks,maxB){let lanes=[];let u=1;for(let b=1;b<=p.port;b++){lanes.push({cls:'bottom',label:'B'+b});if(b<p.port && (b<=p.upP))lanes.push({cls:'upper',label:'U'+(u++)});}for(let w=1;w<=p.wedge;w++)lanes.push({cls:'wedge',label:'W'+w});for(let b=1;b<=p.stbd;b++){lanes.push({cls:'bottom',label:'B'+(p.port+b)});if(b<p.stbd && (b<=p.upS))lanes.push({cls:'upper',label:'U'+(u++)});}return lanes.map(l=>makeLaneRow(l.cls,l.label,blocks,maxB)).join('')}
+function makeRows(p,blocks,maxB){let lanes=[];let u=1;
+  for(let b=1;b<=p.port;b++){
+    lanes.push({cls:'bottom',label:'B'+b});
+    if(b<p.port && (b<=p.upP)) lanes.push({cls:'upper',label:'U'+(u++)});
+    if(p.wedge>=2 && b===Math.max(1,p.port-1)) lanes.push({cls:'wedge',label:'W1'});
+  }
+  if(p.wedge===1) lanes.push({cls:'wedge',label:'W1'});
+  for(let b=1;b<=p.stbd;b++){
+    if(p.wedge>=2 && b===1) lanes.push({cls:'wedge',label:'W2'});
+    lanes.push({cls:'bottom',label:'B'+(p.port+b)});
+    if(b<p.stbd && (b<=p.upS)) lanes.push({cls:'upper',label:'U'+(u++)});
+  }
+  for(let w=3;w<=p.wedge;w++) lanes.push({cls:'wedge',label:'W'+w});
+  return lanes.map(l=>makeLaneRow(l.cls,l.label,blocks,maxB)).join('')}
 function sectionSvg(p){const W=760,H=190,margin=45;const scale=Math.min((W-2*margin)/Math.max(p.W,p.total*p.D+p.gap,1),42);const r=Math.max(10,p.D*scale/2);const base=142;const dy=Math.sqrt(3)*r;let start=(W-(p.total*2*r+p.gap*scale))/2;let centers=[];for(let k=0;k<p.port;k++)centers.push({x:start+r+k*2*r,side:'P'});let stStart=start+p.port*2*r+p.gap*scale;for(let k=0;k<p.stbd;k++)centers.push({x:stStart+r+k*2*r,side:'S'});let svg=`<svg viewBox="0 0 ${W} ${H}"><rect x="20" y="20" width="${W-40}" height="${H-35}" rx="12" fill="#f8fafc" stroke="#cbd5e1"/><line x1="30" y1="${base+r}" x2="${W-30}" y2="${base+r}" stroke="#0f172a" stroke-width="3"/><text x="${W/2}" y="18" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section · Bottom ${p.port}+${p.stbd} · Upper ${p.upP}+${p.upS} · Wedge ${p.wedge}</text>`;centers.forEach((c,k)=>{svg+=`<circle cx="${c.x}" cy="${base}" r="${r}" fill="#16a34a" stroke="#0f172a" stroke-width="1.5"/><text x="${c.x}" y="${base+4}" text-anchor="middle" fill="white" font-weight="800" font-size="${Math.max(9,r*.45)}">B${k+1}</text>`});
 function valley(a,b){const x=(a.x+b.x)/2;const dx=Math.abs(b.x-a.x)/2;const y=base-Math.sqrt(Math.max(0,(2*r)*(2*r)-dx*dx));return{x,y}}
 let upper=[];for(let k=0;k<Math.min(p.upP,Math.max(0,p.port-1));k++)upper.push(valley(centers[k],centers[k+1]));for(let k=0;k<Math.min(p.upS,Math.max(0,p.stbd-1));k++){let idx=p.port+k;upper.push(valley(centers[idx],centers[idx+1]))}upper.forEach((u,k)=>svg+=`<circle cx="${u.x}" cy="${u.y}" r="${r}" fill="#2563eb" stroke="#0f172a" stroke-width="1.5"/><text x="${u.x}" y="${u.y+4}" text-anchor="middle" fill="white" font-weight="800" font-size="${Math.max(9,r*.45)}">U${k+1}</text>`);
-if(p.wedge>0&&p.port>0&&p.stbd>0){let left=centers[p.port-1],right=centers[p.port];let v=valley(left,right);if(p.wedge===1){svg+=`<circle cx="${v.x}" cy="${v.y}" r="${r}" fill="#f4c430" stroke="#0f172a" stroke-width="1.5"/><text x="${v.x}" y="${v.y+4}" text-anchor="middle" fill="#111827" font-weight="900" font-size="${Math.max(9,r*.45)}">W1</text>`}else{let off=r*.72;[v.x-off,v.x+off].forEach((x,k)=>svg+=`<circle cx="${x}" cy="${v.y}" r="${r}" fill="#f4c430" stroke="#0f172a" stroke-width="1.5"/><text x="${x}" y="${v.y+4}" text-anchor="middle" fill="#111827" font-weight="900" font-size="${Math.max(9,r*.45)}">W${k+1}</text>`)}}
+if(p.wedge>0&&p.port>0&&p.stbd>0){
+  function drawW(x,y,label){svg+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#f4c430" stroke="#0f172a" stroke-width="1.5"/><text x="${x}" y="${y+4}" text-anchor="middle" fill="#111827" font-weight="900" font-size="${Math.max(9,r*.45)}">${label}</text>`}
+  if(p.wedge===1){
+    let v=valley(centers[p.port-1],centers[p.port]);
+    drawW(v.x,v.y,'W1');
+  }else{
+    // Auto two-wedge rule: do NOT place both wedges in the same central valley.
+    // Create two support valleys: one on the port side close to centre and one on the starboard side close to centre.
+    // This follows the operational rule: gap > D/3 => two central gaps / two wedge coils.
+    let positions=[];
+    if(p.port>=2) positions.push(valley(centers[p.port-2],centers[p.port-1]));
+    else positions.push(valley(centers[p.port-1],centers[p.port]));
+    if(p.stbd>=2) positions.push(valley(centers[p.port],centers[p.port+1]));
+    else positions.push(valley(centers[p.port-1],centers[p.port]));
+    // If more than two wedges are manually requested, add additional nearest valleys outwards.
+    let leftIdx=p.port-3, rightIdx=p.port+1;
+    while(positions.length<p.wedge && (leftIdx>=0 || rightIdx<centers.length-1)){
+      if(leftIdx>=0){positions.unshift(valley(centers[leftIdx],centers[leftIdx+1])); leftIdx--;}
+      if(positions.length>=p.wedge) break;
+      if(rightIdx<centers.length-1){positions.push(valley(centers[rightIdx],centers[rightIdx+1])); rightIdx++;}
+    }
+    positions.slice(0,p.wedge).forEach((v,k)=>drawW(v.x,v.y,'W'+(k+1)));
+  }
+}
 svg+=`<text x="${W/2}" y="${H-8}" text-anchor="middle" fill="#64748b" font-size="11">Upper coils are manual and positioned in valleys between bottom coils. Bottom can be Auto or Manual.</text></svg>`;return svg}
 function renderSummary(){const rows=allocRows();const allocatedCoils=rows.reduce((s,r)=>s+r.coils,0),allocatedWt=rows.reduce((s,r)=>s+r.weight,0),allocatedLen=rows.reduce((s,r)=>s+r.length,0);const rem=Math.max(0,cargo.coils-allocatedCoils);summaryBox.innerHTML=`<div class="statgrid"><div class="stat"><b>Total coils</b><span>${cargo.coils}</span></div><div class="stat"><b>Total weight</b><span>${cargo.totalWeight.toFixed(1)} t</span></div><div class="stat"><b>Allocated</b><span>${allocatedWt.toFixed(1)} t</span></div><div class="stat"><b>Length used</b><span>${allocatedLen.toFixed(2)} m</span></div><div class="stat"><b>Remaining coils</b><span class="${rem?'warn':'ok'}">${rem}</span></div><div class="stat"><b>Remaining weight</b><span class="${rem?'warn':'ok'}">${(rem*avgT()).toFixed(1)} t</span></div></div><table><thead><tr><th>Hold</th><th>Length</th><th>Blocks</th><th>Coils</th><th>Weight</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.idx===activeHold?'activeRow':''}"><td>${r.h.name}</td><td>${r.length.toFixed(2)} m</td><td>${r.blocks}</td><td>${r.coils}</td><td>${r.weight.toFixed(1)} t</td></tr>`).join('')}</tbody></table><div class="hint">Cargo source: ${cargoSource==='list'?'Cargo List':'Simulation'}. Bottom row: ${bottomMode.toUpperCase()}. Upper row: MANUAL (${upperPort.value}+${upperStbd.value}).</div>`}
 async function importCargo(){const f=cargoFile.files[0];if(!f){alert('Choose cargo file first');return}cargoSource='list';setCargoMode();fileState.textContent=f.name;try{const fd=new FormData();fd.append('cargo_file',f);const res=await fetch('/import-cargo',{method:'POST',body:fd});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Import failed');cargo.coils=data.coil_count;cargo.totalWeight=data.total_weight_t;cargo.avgWeight=data.avg_weight_t||data.total_weight_t/data.coil_count;cargo.avgWidth=data.avg_width_m||1.2;cargo.avgDiameter=data.avg_diameter_m||null;avgWeight.value=cargo.avgWeight.toFixed(2);avgWidth.value=cargo.avgWidth.toFixed(2);if(cargo.avgDiameter){avgDiameter.value=cargo.avgDiameter.toFixed(3);diaHint.textContent='Diameter source: cargo list average '+cargo.avgDiameter.toFixed(3)+' m.'}else diaHint.textContent='No Diameter column found. Enter average diameter manually.';cargo.rows=data.coils||[];cargoPreview.innerHTML=`<b>${data.filename}</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Avg width ${cargo.avgWidth.toFixed(2)} m ${cargo.avgDiameter?'· Avg diameter '+cargo.avgDiameter.toFixed(2)+' m':'· diameter manual'}<table><thead><tr><th>ID</th><th>Weight</th><th>Width</th><th>Diam.</th></tr></thead><tbody>${cargo.rows.slice(0,8).map(c=>`<tr><td>${c.ID}</td><td>${Number(c.Weight_t).toFixed(1)}</td><td>${Number(c.Width_m).toFixed(2)}</td><td>${c.Diameter_m?Number(c.Diameter_m).toFixed(2):'-'}</td></tr>`).join('')}</tbody></table>`;statusBadge.textContent='Cargo imported';allocations={};build()}catch(e){cargoPreview.innerHTML='<span class="bad">'+e.message+'</span>'}}
