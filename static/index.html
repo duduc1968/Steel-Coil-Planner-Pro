@@ -11,7 +11,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Foundation · unified geometry rules</span></div></div><div class="ver">v8.5 beta · Foundation Engine</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Foundation · Width Arrangement Engine</span></div></div><div class="ver">v8.6 beta · Foundation Sprint 1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -41,70 +41,134 @@
 </main>
 <div class="modalOverlay" id="fleetModal"><div class="modal"><div class="modalHead"><h2>Fleet Library</h2><button class="close" id="closeFleet">Close</button></div><div class="modalBody"><div><div class="pt">Saved ships</div><div id="shipList"></div><button class="btn" id="newShip">New ship</button></div><div><label>Ship name</label><input id="libShipName"><label>Hold selector</label><select id="libHoldSel"></select><div class="formgrid"><div><label>Hold name</label><input id="libHoldName"></div><div><label>Length m</label><input id="libLength" type="number" step="0.01"></div><div><label>Width m</label><input id="libWidth" type="number" step="0.01"></div><div><label>Depth m</label><input id="libDepth" type="number" step="0.01"></div><div><label>Default diameter m</label><input id="libDiam" type="number" step="0.01"></div><div><label>Row gap m</label><input id="libGap" type="number" step="0.01"></div></div><div class="actions"><button class="btn" id="saveShip">Save ship</button><button class="btn dark" id="addHold">Add hold</button><button class="btn red" id="deleteHold">Delete hold</button><button class="btn red" id="deleteShip">Delete ship</button></div><div class="hint" id="fleetStatus"></div></div></div></div></div>
 <script>
-const FKEY='scp_fleet_v81';
+const FKEY='scp_fleet_v86';
 const defaultFleet=[{name:'Default coaster',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]},{name:'MV Drogdenbank',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]}];
 let fleet=loadFleet(), activeShip=0, activeHold=0, allocations={}, cargoSource='list', bottomMode='auto', wedgeMode='auto';
 let cargo={coils:120,totalWeight:2400,avgWeight:20,avgWidth:1.2,avgDiameter:null,rows:[]};
 function n(v,d=0){const x=parseFloat(String(v).replace(',','.'));return Number.isFinite(x)?x:d}function i(v,d=0){const x=parseInt(v);return Number.isFinite(x)?x:d}function clamp(x,a,b){return Math.max(a,Math.min(b,x))}function loadFleet(){try{return JSON.parse(localStorage.getItem(FKEY))||defaultFleet}catch(e){return defaultFleet}}function saveFleet(){localStorage.setItem(FKEY,JSON.stringify(fleet))}function ship(){return fleet[activeShip]||fleet[0]}function hold(idx=activeHold){return ship().holds[idx]||ship().holds[0]}function avgT(){return n(avgWeight.value,cargo.avgWeight||20)}function avgW(){return n(avgWidth.value,cargo.avgWidth||1.2)}function dia(){return n(avgDiameter.value,cargo.avgDiameter||hold().diameter||1.8)}function blockLen(){return avgW()+n(rowGap.value,.15)}
 function renderSelectors(){shipSelect.innerHTML=fleet.map((s,idx)=>`<option value="${idx}">${s.name}</option>`).join('');shipSelect.value=activeShip;holdSelect.innerHTML=ship().holds.map((h,idx)=>`<option value="${idx}">${h.name}</option>`).join('');holdSelect.value=activeHold;syncSideFromHold()}
 function syncSideFromHold(){const h=hold();holdWidth.value=n(h.width,11.5);holdLength.value=n(h.length,48);if(!cargo.avgDiameter)avgDiameter.value=n(h.diameter,1.8);rowGap.value=n(h.rowGap,.15)}
-function patternForHold(h){const D=dia(), W=n(h.width,11.5);let port,stbd,total,gap;if(bottomMode==='auto'){total=Math.max(1,Math.floor(W/D));gap=W-total*D;if(gap<0){total=Math.max(0,total-1);gap=W-total*D}port=Math.ceil(total/2);stbd=Math.floor(total/2);centralGap.value=gap.toFixed(2)}else{port=i(bottomPort.value,0);stbd=i(bottomStbd.value,0);total=port+stbd;gap=Math.max(0,W-total*D);centralGap.value=gap.toFixed(2)}const rowGapM=n(rowGap.value,.15);let wedge;if(wedgeMode==='auto'){
-  // SCWAE Foundation rule:
-  // Never create two wedge coils from one central gap.
-  // Auto mode uses one safe central wedge. Two wedges are allowed only in Manual mode
-  // until the engine can prove two separate real support gaps exist.
-  wedge=(total>0 && port>0 && stbd>0)?1:0;
-}else{wedge=i(wedgeCount.value,1)}let upP=i(upperPort.value,0),upS=i(upperStbd.value,0);let coilsPerBlock=total+upP+upS+wedge;return{D,W,port,stbd,total,gap,wedge,upP,upS,rowGapM,coilsPerBlock:Math.max(coilsPerBlock,1)}}
+function widthArrangementEngine(h){
+  const D=dia(), W=n(h.width,11.5);
+  const rowGapM=n(rowGap.value,.15);
+  let bottomPort=0,bottomStbd=0,total=0,gap=0,warnings=[];
+
+  if(bottomMode==='auto'){
+    total=Math.max(1,Math.floor(W/D));
+    gap=W-total*D;
+    while(gap<0 && total>0){total--;gap=W-total*D;}
+    bottomPort=Math.ceil(total/2);
+    bottomStbd=Math.floor(total/2);
+  }else{
+    bottomPort=Math.max(0,i(bottomPort.value,0));
+    bottomStbd=Math.max(0,i(bottomStbd.value,0));
+    total=bottomPort+bottomStbd;
+    gap=W-total*D;
+    if(gap<0) warnings.push('Manual bottom row exceeds hold width.');
+  }
+  centralGap.value=Number.isFinite(gap)?gap.toFixed(2):'0.00';
+
+  const upPReq=Math.max(0,i(upperPort.value,0));
+  const upSReq=Math.max(0,i(upperStbd.value,0));
+  const upP=Math.min(upPReq,Math.max(0,bottomPort-1));
+  const upS=Math.min(upSReq,Math.max(0,bottomStbd-1));
+  if(upPReq>upP) warnings.push('Upper Port exceeds available support valleys.');
+  if(upSReq>upS) warnings.push('Upper Starboard exceeds available support valleys.');
+
+  // Foundation Sprint 1 / SCWAE rule:
+  // Wedge Auto may create one central wedge only. It shall never create two wedges from one single central gap.
+  // Two wedges are possible only by Manual mode until a future rule proves two independent stable central gaps.
+  let wedgeReq=(wedgeMode==='auto') ? ((bottomPort>0&&bottomStbd>0)?1:0) : Math.max(0,i(wedgeCount.value,1));
+  let wedge=Math.min(wedgeReq, Math.max(0, total-1));
+  if(wedgeReq>wedge) warnings.push('Requested wedge count exceeds available support valleys.');
+
+  const pitch=D;
+  const scale=1;
+  const bottomCenters=[];
+  let start=-(total*D+Math.max(0,gap))/2;
+  for(let k=0;k<bottomPort;k++) bottomCenters.push({x:start+D/2+k*pitch, side:'P', bottomIndex:k});
+  const stStart=start+bottomPort*pitch+Math.max(0,gap);
+  for(let k=0;k<bottomStbd;k++) bottomCenters.push({x:stStart+D/2+k*pitch, side:'S', bottomIndex:bottomPort+k});
+
+  function valley(a,b){
+    const x=(a.x+b.x)/2;
+    const dx=Math.abs(b.x-a.x)/2;
+    const y=Math.sqrt(Math.max(0,D*D-dx*dx));
+    return {x,y,support:[a.bottomIndex,b.bottomIndex]};
+  }
+  const coils=[];
+  bottomCenters.forEach((c,k)=>coils.push({id:'B'+(k+1),type:'bottom',tier:'bottom',x:c.x,y:0,diameter:D,width:avgW(),weight:avgT(),hold:h.name,block:1,side:c.side,support:[]}));
+
+  // Upper Port uses valleys within port bottom group, from outboard toward centre.
+  for(let k=0;k<upP;k++){
+    const v=valley(bottomCenters[k],bottomCenters[k+1]);
+    coils.push({id:'U'+(coils.filter(c=>c.type==='upper').length+1),type:'upper',tier:'upper',x:v.x,y:v.y,diameter:D,width:avgW(),weight:avgT(),hold:h.name,block:1,side:'P',support:v.support});
+  }
+  // Upper Starboard uses valleys within starboard bottom group, from centre outward.
+  for(let k=0;k<upS;k++){
+    const idx=bottomPort+k;
+    if(bottomCenters[idx]&&bottomCenters[idx+1]){
+      const v=valley(bottomCenters[idx],bottomCenters[idx+1]);
+      coils.push({id:'U'+(coils.filter(c=>c.type==='upper').length+1),type:'upper',tier:'upper',x:v.x,y:v.y,diameter:D,width:avgW(),weight:avgT(),hold:h.name,block:1,side:'S',support:v.support});
+    }
+  }
+
+  function addWedgeAt(a,b,label){
+    if(!a||!b) return;
+    const v=valley(a,b);
+    coils.push({id:label,type:'wedge',tier:'wedge',x:v.x,y:v.y,diameter:D,width:avgW(),weight:avgT(),hold:h.name,block:1,side:'C',support:v.support});
+  }
+  if(wedge===1 && bottomPort>0 && bottomStbd>0){
+    addWedgeAt(bottomCenters[bottomPort-1],bottomCenters[bottomPort],'W1');
+  }else if(wedge>1){
+    // Manual wedge mode: use real support valleys, never place two wedges on the same support pair.
+    const candidates=[];
+    if(bottomPort>=2) candidates.push([bottomCenters[bottomPort-2],bottomCenters[bottomPort-1]]);
+    if(bottomStbd>=2) candidates.push([bottomCenters[bottomPort],bottomCenters[bottomPort+1]]);
+    // Add more valleys outwards if user requests more wedges.
+    let left=bottomPort-3,right=bottomPort+1;
+    while(candidates.length<wedge && (left>=0 || right<bottomCenters.length-1)){
+      if(left>=0){candidates.unshift([bottomCenters[left],bottomCenters[left+1]]);left--;}
+      if(candidates.length>=wedge) break;
+      if(right<bottomCenters.length-1){candidates.push([bottomCenters[right],bottomCenters[right+1]]);right++;}
+    }
+    candidates.slice(0,wedge).forEach((pair,k)=>addWedgeAt(pair[0],pair[1],'W'+(k+1)));
+    if(candidates.length<wedge) warnings.push('Not enough independent support valleys for requested wedges.');
+  }
+
+  const coilsPerBlock=coils.length||1;
+  return {D,W,port:bottomPort,stbd:bottomStbd,total,gap,rowGapM,upPReq,upSReq,upP,upS,wedgeReq,wedge,coilsPerBlock,coils,warnings};
+}
+function patternForHold(h){return widthArrangementEngine(h)}
 function maxBlocks(h){return Math.floor(n(h.length,0)/blockLen())}function lengthForBlocks(b){return Math.max(0,b)*blockLen()}function blocksForLength(len,h){return clamp(Math.round(n(len,0)/blockLen()),0,maxBlocks(h))}
 function initAllocations(){ship().holds.forEach(h=>{if(!(h.name in allocations))allocations[h.name]=0})}
 function recomputeFrom(changedIdx){let remaining=cargo.coils;ship().holds.forEach((h,idx)=>{const p=patternForHold(h);let blocks=blocksForLength(allocations[h.name],h);if(idx>changedIdx){blocks=clamp(Math.ceil(remaining/p.coilsPerBlock),0,maxBlocks(h));allocations[h.name]=lengthForBlocks(blocks)}const coils=Math.min(remaining,blocks*p.coilsPerBlock);remaining-=coils});renderWorkspace(false)}
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=blocksForLength(allocations[h.name]||0,h);const capacity=blocks*p.coilsPerBlock;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=lengthForBlocks(blocks);totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen())}renderWorkspace();statusBadge.textContent='Workspace live'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen())}renderWorkspace();statusBadge.textContent='Foundation Sprint 1 active'}
 function renderWorkspace(redraw=true){const rows=allocRows();holdsWorkspace.innerHTML=rows.map(holdCard).join('');rows.forEach(r=>{document.getElementById('range_'+r.idx).addEventListener('input',e=>{allocations[r.h.name]=lengthForBlocks(Number(e.target.value));activeHold=r.idx;renderSelectors();recomputeFrom(r.idx)});document.getElementById('card_'+r.idx).addEventListener('click',()=>{activeHold=r.idx;renderSelectors();renderWorkspace()})});renderSummary()}
-function holdCard(r){const maxB=maxBlocks(r.h);const pct=maxB?(r.blocks/maxB*100):0;const loadedBlocks=Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock));return `<div class="hold-card ${r.idx===activeHold?'active':''}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="plan"><div class="rows">${makeRows(r.p,loadedBlocks,maxB)}</div><div class="marker" style="left:calc(10px + (100% - 20px)*${pct/100})"><div class="marker-label">${r.length.toFixed(2)} m | ${r.coils} coils | ${r.weight.toFixed(1)} t</div></div></div><div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}"><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div><div class="section">${sectionSvg(r.p)}</div></div></div>`}
+function holdCard(r){const maxB=maxBlocks(r.h);const pct=maxB?(r.blocks/maxB*100):0;const loadedBlocks=Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock));const warn=r.p.warnings.length?`<div class="hint warn">⚠ ${r.p.warnings.join(' ')}</div>`:'';return `<div class="hold-card ${r.idx===activeHold?'active':''}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="plan"><div class="rows">${makeRows(r.p,loadedBlocks,maxB)}</div><div class="marker" style="left:calc(10px + (100% - 20px)*${pct/100})"><div class="marker-label">${r.length.toFixed(2)} m | ${r.coils} coils | ${r.weight.toFixed(1)} t</div></div></div><div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}"><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>${warn}<div class="section">${sectionSvg(r.p)}</div></div></div>`}
 function makeLaneRow(cls,label,blocks,maxB){let s='<div class="row">';for(let k=0;k<maxB;k++)s+=`<div class="block ${k<blocks?cls:'free'}" style="flex:1">${k<blocks?label:''}</div>`;return s+'</div>'}
-function makeRows(p,blocks,maxB){let lanes=[];let u=1;
-  for(let b=1;b<=p.port;b++){
-    lanes.push({cls:'bottom',label:'B'+b});
-    if(b<p.port && (b<=p.upP)) lanes.push({cls:'upper',label:'U'+(u++)});
-    if(p.wedge>=2 && b===Math.max(1,p.port-1)) lanes.push({cls:'wedge',label:'W1'});
-  }
-  if(p.wedge===1) lanes.push({cls:'wedge',label:'W1'});
-  for(let b=1;b<=p.stbd;b++){
-    if(p.wedge>=2 && b===1) lanes.push({cls:'wedge',label:'W2'});
-    lanes.push({cls:'bottom',label:'B'+(p.port+b)});
-    if(b<p.stbd && (b<=p.upS)) lanes.push({cls:'upper',label:'U'+(u++)});
-  }
-  for(let w=3;w<=p.wedge;w++) lanes.push({cls:'wedge',label:'W'+w});
-  return lanes.map(l=>makeLaneRow(l.cls,l.label,blocks,maxB)).join('')}
-function sectionSvg(p){const W=760,H=190,margin=45;const scale=Math.min((W-2*margin)/Math.max(p.W,p.total*p.D+p.gap,1),42);const r=Math.max(10,p.D*scale/2);const base=142;const dy=Math.sqrt(3)*r;let start=(W-(p.total*2*r+p.gap*scale))/2;let centers=[];for(let k=0;k<p.port;k++)centers.push({x:start+r+k*2*r,side:'P'});let stStart=start+p.port*2*r+p.gap*scale;for(let k=0;k<p.stbd;k++)centers.push({x:stStart+r+k*2*r,side:'S'});let svg=`<svg viewBox="0 0 ${W} ${H}"><rect x="20" y="20" width="${W-40}" height="${H-35}" rx="12" fill="#f8fafc" stroke="#cbd5e1"/><line x1="30" y1="${base+r}" x2="${W-30}" y2="${base+r}" stroke="#0f172a" stroke-width="3"/><text x="${W/2}" y="18" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section · Bottom ${p.port}+${p.stbd} · Upper ${p.upP}+${p.upS} · Wedge ${p.wedge}</text>`;centers.forEach((c,k)=>{svg+=`<circle cx="${c.x}" cy="${base}" r="${r}" fill="#16a34a" stroke="#0f172a" stroke-width="1.5"/><text x="${c.x}" y="${base+4}" text-anchor="middle" fill="white" font-weight="800" font-size="${Math.max(9,r*.45)}">B${k+1}</text>`});
-function valley(a,b){const x=(a.x+b.x)/2;const dx=Math.abs(b.x-a.x)/2;const y=base-Math.sqrt(Math.max(0,(2*r)*(2*r)-dx*dx));return{x,y}}
-let upper=[];for(let k=0;k<Math.min(p.upP,Math.max(0,p.port-1));k++)upper.push(valley(centers[k],centers[k+1]));for(let k=0;k<Math.min(p.upS,Math.max(0,p.stbd-1));k++){let idx=p.port+k;upper.push(valley(centers[idx],centers[idx+1]))}upper.forEach((u,k)=>svg+=`<circle cx="${u.x}" cy="${u.y}" r="${r}" fill="#2563eb" stroke="#0f172a" stroke-width="1.5"/><text x="${u.x}" y="${u.y+4}" text-anchor="middle" fill="white" font-weight="800" font-size="${Math.max(9,r*.45)}">U${k+1}</text>`);
-if(p.wedge>0&&p.port>0&&p.stbd>0){
-  function drawW(x,y,label){svg+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#f4c430" stroke="#0f172a" stroke-width="1.5"/><text x="${x}" y="${y+4}" text-anchor="middle" fill="#111827" font-weight="900" font-size="${Math.max(9,r*.45)}">${label}</text>`}
-  if(p.wedge===1){
-    let v=valley(centers[p.port-1],centers[p.port]);
-    drawW(v.x,v.y,'W1');
-  }else{
-    // Auto two-wedge rule: do NOT place both wedges in the same central valley.
-    // Create two support valleys: one on the port side close to centre and one on the starboard side close to centre.
-    // This follows SCWAE: two wedges only when the real central surplus can create two working support gaps.
-    let positions=[];
-    if(p.port>=2) positions.push(valley(centers[p.port-2],centers[p.port-1]));
-    else positions.push(valley(centers[p.port-1],centers[p.port]));
-    if(p.stbd>=2) positions.push(valley(centers[p.port],centers[p.port+1]));
-    else positions.push(valley(centers[p.port-1],centers[p.port]));
-    // If more than two wedges are manually requested, add additional nearest valleys outwards.
-    let leftIdx=p.port-3, rightIdx=p.port+1;
-    while(positions.length<p.wedge && (leftIdx>=0 || rightIdx<centers.length-1)){
-      if(leftIdx>=0){positions.unshift(valley(centers[leftIdx],centers[leftIdx+1])); leftIdx--;}
-      if(positions.length>=p.wedge) break;
-      if(rightIdx<centers.length-1){positions.push(valley(centers[rightIdx],centers[rightIdx+1])); rightIdx++;}
-    }
-    positions.slice(0,p.wedge).forEach((v,k)=>drawW(v.x,v.y,'W'+(k+1)));
-  }
+function makeRows(p,blocks,maxB){
+  const ordered=[...p.coils].sort((a,b)=>a.x-b.x || ({bottom:0,upper:1,wedge:2}[a.type]-{bottom:0,upper:1,wedge:2}[b.type]));
+  return ordered.map(c=>makeLaneRow(c.type,c.id,blocks,maxB)).join('');
 }
-svg+=`<text x="${W/2}" y="${H-8}" text-anchor="middle" fill="#64748b" font-size="11">Upper coils are manual and positioned in valleys between bottom coils. Bottom can be Auto or Manual.</text></svg>`;return svg}
+function sectionSvg(p){
+  const W=760,H=190,margin=45;
+  const minX=Math.min(...p.coils.map(c=>c.x-c.diameter/2),-p.W/2), maxX=Math.max(...p.coils.map(c=>c.x+c.diameter/2),p.W/2);
+  const span=Math.max(maxX-minX,p.W,1);
+  const scale=Math.min((W-2*margin)/span,42);
+  const base=142;
+  function sx(x){return W/2 + x*scale}
+  function sy(y,d){return base - y*scale}
+  let svg=`<svg viewBox="0 0 ${W} ${H}"><rect x="20" y="20" width="${W-40}" height="${H-35}" rx="12" fill="#f8fafc" stroke="#cbd5e1"/><line x1="30" y1="${base+p.D*scale/2}" x2="${W-30}" y2="${base+p.D*scale/2}" stroke="#0f172a" stroke-width="3"/><line x1="${W/2}" y1="28" x2="${W/2}" y2="${H-30}" stroke="#94a3b8" stroke-dasharray="4 4"/><text x="${W/2}" y="18" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section · Bottom ${p.port}+${p.stbd} · Upper ${p.upPReq}+${p.upSReq} manual · Wedge ${p.wedge} ${wedgeMode==='auto'?'auto':'manual'}</text>`;
+  p.coils.forEach(c=>{
+    const r=c.diameter*scale/2;
+    const color=c.type==='bottom'?'#16a34a':c.type==='upper'?'#2563eb':'#f4c430';
+    const ink=c.type==='wedge'?'#111827':'#fff';
+    svg+=`<circle cx="${sx(c.x)}" cy="${sy(c.y)}" r="${r}" fill="${color}" stroke="#0f172a" stroke-width="1.5"/><text x="${sx(c.x)}" y="${sy(c.y)+4}" text-anchor="middle" fill="${ink}" font-weight="900" font-size="${Math.max(9,r*.45)}">${c.id}</text>`;
+  });
+  svg+=`<text x="${W/2}" y="${H-8}" text-anchor="middle" fill="#64748b" font-size="11">Geometry output is produced once by the Width Arrangement Engine. Renderers do not recalculate stowage.</text></svg>`;return svg;
+}
 function renderSummary(){const rows=allocRows();const allocatedCoils=rows.reduce((s,r)=>s+r.coils,0),allocatedWt=rows.reduce((s,r)=>s+r.weight,0),allocatedLen=rows.reduce((s,r)=>s+r.length,0);const rem=Math.max(0,cargo.coils-allocatedCoils);summaryBox.innerHTML=`<div class="statgrid"><div class="stat"><b>Total coils</b><span>${cargo.coils}</span></div><div class="stat"><b>Total weight</b><span>${cargo.totalWeight.toFixed(1)} t</span></div><div class="stat"><b>Allocated</b><span>${allocatedWt.toFixed(1)} t</span></div><div class="stat"><b>Length used</b><span>${allocatedLen.toFixed(2)} m</span></div><div class="stat"><b>Remaining coils</b><span class="${rem?'warn':'ok'}">${rem}</span></div><div class="stat"><b>Remaining weight</b><span class="${rem?'warn':'ok'}">${(rem*avgT()).toFixed(1)} t</span></div></div><table><thead><tr><th>Hold</th><th>Length</th><th>Blocks</th><th>Coils</th><th>Weight</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.idx===activeHold?'activeRow':''}"><td>${r.h.name}</td><td>${r.length.toFixed(2)} m</td><td>${r.blocks}</td><td>${r.coils}</td><td>${r.weight.toFixed(1)} t</td></tr>`).join('')}</tbody></table><div class="hint">Cargo source: ${cargoSource==='list'?'Cargo List':'Simulation'}. Bottom row: ${bottomMode.toUpperCase()}. Upper row: MANUAL (${upperPort.value}+${upperStbd.value}). SCWAE active.</div>`}
 async function importCargo(){const f=cargoFile.files[0];if(!f){alert('Choose cargo file first');return}cargoSource='list';setCargoMode();fileState.textContent=f.name;try{const fd=new FormData();fd.append('cargo_file',f);const res=await fetch('/import-cargo',{method:'POST',body:fd});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Import failed');cargo.coils=data.coil_count;cargo.totalWeight=data.total_weight_t;cargo.avgWeight=data.avg_weight_t||data.total_weight_t/data.coil_count;cargo.avgWidth=data.avg_width_m||1.2;cargo.avgDiameter=data.avg_diameter_m||null;avgWeight.value=cargo.avgWeight.toFixed(2);avgWidth.value=cargo.avgWidth.toFixed(2);if(cargo.avgDiameter){avgDiameter.value=cargo.avgDiameter.toFixed(3);diaHint.textContent='Diameter source: cargo list average '+cargo.avgDiameter.toFixed(3)+' m.'}else diaHint.textContent='No Diameter column found. Enter average diameter manually.';cargo.rows=data.coils||[];cargoPreview.innerHTML=`<b>${data.filename}</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Avg width ${cargo.avgWidth.toFixed(2)} m ${cargo.avgDiameter?'· Avg diameter '+cargo.avgDiameter.toFixed(2)+' m':'· diameter manual'}<table><thead><tr><th>ID</th><th>Weight</th><th>Width</th><th>Diam.</th></tr></thead><tbody>${cargo.rows.slice(0,8).map(c=>`<tr><td>${c.ID}</td><td>${Number(c.Weight_t).toFixed(1)}</td><td>${Number(c.Width_m).toFixed(2)}</td><td>${c.Diameter_m?Number(c.Diameter_m).toFixed(2):'-'}</td></tr>`).join('')}</tbody></table>`;statusBadge.textContent='Cargo imported';allocations={};build()}catch(e){cargoPreview.innerHTML='<span class="bad">'+e.message+'</span>'}}
 function setCargoMode(){cargoListMode.classList.toggle('active',cargoSource==='list');simulationMode.classList.toggle('active',cargoSource==='sim');cargoListPanel.style.display=cargoSource==='list'?'block':'none';simulationPanel.style.display=cargoSource==='sim'?'block':'none'}
