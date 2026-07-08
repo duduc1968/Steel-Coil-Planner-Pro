@@ -5,7 +5,7 @@ Fixes the automatic wedge rule:
 - gap > diameter / 3: two wedge coils in two support valleys, not overlapped
 - keeps v8 workspace and unified renderer
 
-## Foundation Sprint 1 – Width Arrangement Engine
+## Foundation Engine Fix – Width Arrangement Engine
 
 This build introduces a single Width Arrangement Engine (`widthArrangementEngine`) inside the main workspace script. The engine outputs geometry objects used by both Top View and Cross Section. Renderers no longer decide wedge count independently.
 

@@ -1,4 +1,4 @@
-# Foundation Sprint 1 – Width Arrangement Engine
+# Foundation Engine Fix – Width Arrangement Engine
 
 ## Goal
 Create a standalone Width Arrangement Engine that outputs coil geometry objects for renderers.
