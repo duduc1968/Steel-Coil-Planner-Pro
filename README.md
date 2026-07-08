@@ -1,7 +1,8 @@
-# Steel Coil Planner Pro v8.11 – Upper Support Validation
+# Steel Coil Planner Pro v8.12
 
-Fixes:
-- invalidates Manual Bottom cases with oversized single central gap when Wedge Auto would need a second real gap;
-- invalidates unsupported upper row requests;
-- invalidates wedge requests that exceed real bottom gaps;
-- does not render invalid geometry.
+Manual Validation Correction.
+
+Changes:
+- Manual mode invalidation is based on Bottom + Wedge physical coverage, not upper support count.
+- Auto mode is not invalidated by manual validation rules; it continues to optimize itself.
+- Upper support shortage is shown as a warning and only supported upper coils are rendered.
