@@ -1,18 +1,11 @@
-# Steel Coil Planner Pro v8.8
+# Steel Coil Planner Pro v8.9 – Validation Engine
 
-Foundation Sprint – Width Arrangement Engine Rewrite.
+This release adds a Validation Engine between the Width Arrangement Engine and the Geometry/Rendering engines.
 
-## Focus
+## Main fix
+Manual impossible patterns are no longer drawn as valid.
 
-This version rewrites the width engine from the bottom row upward:
+Example: if Bottom Manual 6+6 with given diameter exceeds hold width, the app displays INVALID PATTERN and stops rendering geometry for that hold.
 
-Bottom Row -> Real gaps / valleys -> Wedge coils -> Upper coils -> Geometry -> Rendering
-
-## Key fixes
-
-- Wedge coils now secure the bottom row.
-- Two wedges are never placed in one single central gap.
-- If gap > D/3, the bottom row is split into three groups to create two real wedge gaps.
-- Upper coils are distributed from the wedge/centre towards the ship sides.
-- Cross Section and Top View use the same geometry object.
-
+## Architecture
+Input → Width Arrangement Engine → Validation Engine → Geometry → Rendering
