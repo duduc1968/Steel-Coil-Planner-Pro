@@ -1,6 +1,7 @@
-# Deploy v8.8 to Render
+# Deploy v8.15 to Render
 
-1. Upload the contents of this package to the GitHub repository root.
+1. Upload all files to GitHub.
 2. Commit changes.
-3. Render auto-deploy should start from the new commit.
-4. When deploy is live, hard refresh browser with Ctrl+F5.
+3. Render auto-deploy should start.
+4. Wait until deploy is live.
+5. Open the app and confirm the badge shows Foundation v8.15 active.

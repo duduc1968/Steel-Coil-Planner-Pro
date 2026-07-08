@@ -1,18 +1,17 @@
-# Steel Coil Planner Pro – v8.13 Geometry Engine
+# Steel Coil Planner Pro – v8.15 Valley Engine
 
-Foundation Sprint 2 introduces a dedicated Geometry Engine.
+Foundation v8.15 adds a dedicated Valley Engine.
 
-## Main change
+## Main changes
 
-Validated Width Engine output is normalized into one geometry model consumed by renderers.
+- Detects real support valleys and wedge valleys from fixed Bottom Row geometry.
+- Bottom Row is never reorganized by Wedge or Upper placement.
+- Wedge coils are placed only in real wedge gaps.
+- Upper coils are placed only in real support valleys.
+- Cross Section and Top View continue to consume the same Geometry Engine model.
 
-## Rule
+## Upload
 
-Geometry Engine does not decide stowage. It only provides coordinates.
+Upload all files to GitHub and commit:
 
-## Included
-
-- Width Arrangement Engine from v8.12
-- Manual Validation Correction
-- Geometry Engine module
-- Geometry Engine documentation
+`Foundation v8.15 - Valley Engine`
