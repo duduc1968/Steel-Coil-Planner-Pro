@@ -1,7 +1,6 @@
-# Deploy v8.15 to Render
+# Deploy to Render
 
-1. Upload all files to GitHub.
-2. Commit changes.
-3. Render auto-deploy should start.
-4. Wait until deploy is live.
-5. Open the app and confirm the badge shows Foundation v8.15 active.
+1. Upload all extracted files to the GitHub repository, replacing the previous version.
+2. Commit changes with message: `Foundation v8.18 - Validation UI Final Polish`.
+3. Render should auto-deploy from the main branch.
+4. Open the app and confirm the top badge shows Foundation v8.18 active after building the workspace.
