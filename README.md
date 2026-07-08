@@ -1,6 +1,6 @@
-# Steel Coil Planner Pro – v8.16 Validation Message Refinement
+# Steel Coil Planner Pro – v8.17 Validation Message Layout
 
-Foundation v8.16 adds a dedicated Validation Message Refinement.
+Foundation v8.17 refines validation messages into a structured Requested / Supported / Warning layout without changing engine logic.
 
 ## Main changes
 
@@ -14,4 +14,4 @@ Foundation v8.16 adds a dedicated Validation Message Refinement.
 
 Upload all files to GitHub and commit:
 
-`Foundation v8.16 - Validation Message Refinement`
+`Foundation v8.17 - Validation Message Layout`
