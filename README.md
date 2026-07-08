@@ -1,12 +1,18 @@
-# Steel Coil Planner Pro v8.3 – Wedge Auto Gap Fix
+# Steel Coil Planner Pro v8.8
 
-Fixes the automatic wedge rule:
-- gap <= diameter / 3: one central wedge / one central gap
-- gap > diameter / 3: two wedge coils in two support valleys, not overlapped
-- keeps v8 workspace and unified renderer
+Foundation Sprint – Width Arrangement Engine Rewrite.
 
-## Foundation Engine Fix – Width Arrangement Engine
+## Focus
 
-This build introduces a single Width Arrangement Engine (`widthArrangementEngine`) inside the main workspace script. The engine outputs geometry objects used by both Top View and Cross Section. Renderers no longer decide wedge count independently.
+This version rewrites the width engine from the bottom row upward:
 
-Critical rule: **Wedge Auto never creates two wedge coils inside one central gap.** Two wedges remain available only in Manual mode until two independent stable gaps are specified and validated.
+Bottom Row -> Real gaps / valleys -> Wedge coils -> Upper coils -> Geometry -> Rendering
+
+## Key fixes
+
+- Wedge coils now secure the bottom row.
+- Two wedges are never placed in one single central gap.
+- If gap > D/3, the bottom row is split into three groups to create two real wedge gaps.
+- Upper coils are distributed from the wedge/centre towards the ship sides.
+- Cross Section and Top View use the same geometry object.
+

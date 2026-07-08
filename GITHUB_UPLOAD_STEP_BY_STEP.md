@@ -1,4 +1,6 @@
-# GitHub Upload
+# GitHub Upload v8.8
 
-Upload all files and folders from this ZIP to the repository root, replacing old files.
-Commit message suggestion: `v8.0 next architecture multi-hold workspace`.
+1. Open the repository in GitHub.
+2. Upload all files/folders from this ZIP to the repository root.
+3. Replace existing files when GitHub asks.
+4. Commit directly to main.

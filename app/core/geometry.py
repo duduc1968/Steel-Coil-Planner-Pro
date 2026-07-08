@@ -111,46 +111,50 @@ def _multi_split_centers(group_counts, W, D, gaps):
 
 
 def auto_width_wedge_positions(hold_width_m: float, diameter_m: float):
-    """Automatic cross-section based on hold width and planning diameter.
+    """Foundation v8.8 Width Arrangement Engine.
+
+    The wedge coil secures the bottom row. It is never created merely as a
+    graphic decoration. The engine first creates the bottom geometry, then
+    detects real gaps between bottom groups, then places wedge coils in those
+    real gaps.
 
     Rules:
-    - bottom coils = floor(hold_width / diameter)
-    - central gap = hold_width - bottom*diameter
-    - if gap < 0, remove one bottom coil and recalc gap
-    - if gap > diameter/3, use 2 wedge coils, creating two gaps
-    - otherwise use 1 wedge coil
-    - upper coils are always one fewer than the corresponding bottom group and
-      are placed in the valleys, touching the two bottom coils.
+    - If remaining free width <= D/3: one central gap and one wedge.
+    - If remaining free width > D/3 and there are enough bottom coils: create
+      two real gaps by splitting the bottom row into three groups, then place
+      one wedge in each real gap.
+    - Never place two wedge coils inside one single central gap.
     """
     W = float(hold_width_m); D = float(diameter_m); r = D / 2
-    bottom_total = max(1, int(math.floor(W / D + 1e-9)))
-    gap_total = W - bottom_total * D
-    if gap_total < -1e-9:
-        bottom_total = max(1, bottom_total - 1)
-        gap_total = W - bottom_total * D
-    wedge_count = 2 if gap_total > D / 3 else 1
+    total = max(1, int(math.floor(W / D + 1e-9)))
+    gap = W - total * D
+    while gap < -1e-9 and total > 0:
+        total -= 1
+        gap = W - total * D
+    gap = max(0.0, gap)
+
+    if gap > D / 3 and total >= 6:
+        if total == 8:
+            groups_n = [3, 2, 3]
+        else:
+            left = total // 3
+            right = left
+            centre = total - left - right
+            if centre > left + 1 and left > 1:
+                left += 1; centre -= 1
+            if centre > right + 1 and right > 1:
+                right += 1; centre -= 1
+            groups_n = [left, centre, right]
+        gaps = [gap / 2, gap / 2]
+    else:
+        left = (total + 1) // 2
+        right = total - left
+        groups_n = [left, right] if right > 0 else [left]
+        gaps = [gap] if right > 0 else []
+
+    groups = _multi_split_centers(groups_n, W, D, gaps)
     z0 = r + 0.20
     positions = []
-
-    if wedge_count == 1:
-        left_n = (bottom_total + 1) // 2
-        right_n = bottom_total - left_n
-        groups = _multi_split_centers([left_n, right_n], W, D, [gap_total])
-    else:
-        # Split bottom coils into 3 practical groups and divide the free space
-        # into two gaps. The port side receives the extra coil where needed.
-        a = (bottom_total + 2) // 3
-        b = (bottom_total + 1) // 3
-        c = bottom_total - a - b
-        if c <= 0:
-            wedge_count = 1
-            left_n = (bottom_total + 1) // 2
-            right_n = bottom_total - left_n
-            groups = _multi_split_centers([left_n, right_n], W, D, [gap_total])
-        else:
-            groups = _multi_split_centers([a, b, c], W, D, [gap_total / 2, gap_total / 2])
-
-    # bottom labels
     idx = 1
     for group in groups:
         for y in group:
@@ -158,22 +162,25 @@ def auto_width_wedge_positions(hold_width_m: float, diameter_m: float):
 
     def valley_z(left_y, right_y):
         dx = abs(float(right_y) - float(left_y)) / 2
-        if dx >= D:
-            return z0 + math.sqrt(max(D**2 - (D/2)**2, 0))
         return z0 + math.sqrt(max(D**2 - dx**2, 0))
 
-    # upper in each group
-    uidx = 1
-    for group in groups:
-        for i in range(len(group)-1):
-            positions.append(("Upper", f"U{uidx}", (group[i]+group[i+1])/2, valley_z(group[i], group[i+1])))
-            uidx += 1
-
-    # wedge(s) between groups
-    for wi in range(len(groups)-1):
+    # Wedges in real gaps between bottom groups only.
+    for wi in range(len(groups) - 1):
         left = groups[wi][-1]
-        right = groups[wi+1][0]
-        positions.append(("Wedge", f"W{wi+1}", (left+right)/2, valley_z(left, right)))
+        right = groups[wi + 1][0]
+        positions.append(("Wedge", f"W{wi+1}", (left + right) / 2, valley_z(left, right)))
+
+    # Upper coils are in real support valleys, selected from centre/wedge outboard.
+    valleys = []
+    for group in groups:
+        for i in range(len(group) - 1):
+            mid = (group[i] + group[i+1]) / 2
+            valleys.append((mid, group[i], group[i+1]))
+    left_valleys = sorted([v for v in valleys if v[0] < W / 2], key=lambda v: v[0], reverse=True)
+    right_valleys = sorted([v for v in valleys if v[0] > W / 2], key=lambda v: v[0])
+    uidx = 1
+    for mid, a, b in left_valleys + right_valleys:
+        positions.append(("Upper", f"U{uidx}", mid, valley_z(a, b))); uidx += 1
 
     return positions
 

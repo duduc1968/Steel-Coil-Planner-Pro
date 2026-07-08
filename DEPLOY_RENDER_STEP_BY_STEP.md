@@ -1,7 +1,6 @@
-# Deploy to Render
+# Deploy v8.8 to Render
 
-1. Unzip this package.
-2. Upload/commit all files to your GitHub repository.
-3. On Render, redeploy the web service.
-4. Hard refresh browser with Ctrl+F5 or open Incognito.
-5. Confirm top right shows: v8.0 beta · Steel Coil Planner Pro Next.
+1. Upload the contents of this package to the GitHub repository root.
+2. Commit changes.
+3. Render auto-deploy should start from the new commit.
+4. When deploy is live, hard refresh browser with Ctrl+F5.
