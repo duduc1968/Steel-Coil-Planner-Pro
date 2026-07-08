@@ -1,6 +1,6 @@
-# Steel Coil Planner Pro – v8.15 Valley Engine
+# Steel Coil Planner Pro – v8.16 Validation Message Refinement
 
-Foundation v8.15 adds a dedicated Valley Engine.
+Foundation v8.16 adds a dedicated Validation Message Refinement.
 
 ## Main changes
 
@@ -14,4 +14,4 @@ Foundation v8.15 adds a dedicated Valley Engine.
 
 Upload all files to GitHub and commit:
 
-`Foundation v8.15 - Valley Engine`
+`Foundation v8.16 - Validation Message Refinement`
