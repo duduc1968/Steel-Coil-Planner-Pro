@@ -1,19 +1,16 @@
-# Steel Coil Planner Pro v8.18
+# Steel Coil Planner Pro v8.19 – Allocation Bidirectional Fix
 
-Foundation Validation UI Final Polish.
-
-This package changes validation message presentation only. No stowage algorithms were changed.
+This build fixes bidirectional cargo allocation between holds.
 
 ## Main change
 
-Upper Row Validation now shows:
+Moving the marker on any hold now causes all other holds to recalculate from the remaining cargo.
 
-- Requested upper row: Port / Starboard
-- Supported upper row: Port / Starboard
-- Dynamic warning based on the number of unsupported upper coils
+## Preserved
 
-Example:
+- Width Engine unchanged
+- Validation Engine unchanged
+- Geometry Engine unchanged
+- Valley Engine unchanged
+- Renderer unchanged
 
-```text
-3 requested upper coils cannot be supported by the current bottom arrangement and wedge geometry.
-```
