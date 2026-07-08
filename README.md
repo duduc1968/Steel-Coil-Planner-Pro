@@ -1,8 +1,18 @@
-# Steel Coil Planner Pro v8.12
+# Steel Coil Planner Pro – v8.13 Geometry Engine
 
-Manual Validation Correction.
+Foundation Sprint 2 introduces a dedicated Geometry Engine.
 
-Changes:
-- Manual mode invalidation is based on Bottom + Wedge physical coverage, not upper support count.
-- Auto mode is not invalidated by manual validation rules; it continues to optimize itself.
-- Upper support shortage is shown as a warning and only supported upper coils are rendered.
+## Main change
+
+Validated Width Engine output is normalized into one geometry model consumed by renderers.
+
+## Rule
+
+Geometry Engine does not decide stowage. It only provides coordinates.
+
+## Included
+
+- Width Arrangement Engine from v8.12
+- Manual Validation Correction
+- Geometry Engine module
+- Geometry Engine documentation

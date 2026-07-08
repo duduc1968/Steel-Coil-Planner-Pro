@@ -11,7 +11,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Foundation · Refined Width Engine</span></div></div><div class="ver">v8.12 beta · Manual Validation Correction</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro</h1><span>Foundation · Geometry Engine</span></div></div><div class="ver">v8.13 beta · Geometry Engine</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -198,39 +198,65 @@ function widthArrangementEngine(h){
   const coilsPerBlock=coils.length||1;
   return {D,W,port:portBottom,stbd:stbdBottom,total,gap,rowGapM,groups,gaps,upPReq,upSReq,upP,upS,wedgeReq,wedge,coilsPerBlock,coils,warnings,errors,valid:true,status:warnings.length?'VALID WITH WARNINGS':'VALID'};
 }
+
+function geometryEngine(pattern){
+  // Foundation Sprint 2: Geometry Engine is the single geometry model.
+  // It does not decide stowage. It only normalizes validated Width Engine output.
+  if(!pattern || !pattern.valid){return {valid:false, coils:[], errors:(pattern&&pattern.errors)||['Invalid pattern']};}
+  const coils = pattern.coils.map((c, idx)=>({
+    uid: c.id + '_' + idx,
+    id: c.id,
+    type: c.type,
+    tier: c.tier,
+    x: Number(c.x),
+    y: Number(c.y),
+    diameter: Number(c.diameter),
+    radius: Number(c.diameter)/2,
+    width: Number(c.width),
+    weight: Number(c.weight),
+    hold: c.hold,
+    block: c.block,
+    side: c.side,
+    support: c.support || []
+  }));
+  return {valid:true, W:pattern.W, D:pattern.D, coils, warnings:pattern.warnings||[], errors:[]};
+}
+
 function patternForHold(h){return widthArrangementEngine(h)}
 function maxBlocks(h){return Math.floor(n(h.length,0)/blockLen())}function lengthForBlocks(b){return Math.max(0,b)*blockLen()}function blocksForLength(len,h){return clamp(Math.round(n(len,0)/blockLen()),0,maxBlocks(h))}
 function initAllocations(){ship().holds.forEach(h=>{if(!(h.name in allocations))allocations[h.name]=0})}
 function recomputeFrom(changedIdx){let remaining=cargo.coils;ship().holds.forEach((h,idx)=>{const p=patternForHold(h);let blocks=blocksForLength(allocations[h.name],h);const cp=p.valid?p.coilsPerBlock:0;if(idx>changedIdx){blocks=cp?clamp(Math.ceil(remaining/cp),0,maxBlocks(h)):0;allocations[h.name]=lengthForBlocks(blocks)}const coils=cp?Math.min(remaining,blocks*cp):0;remaining-=coils});renderWorkspace(false)}
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();statusBadge.textContent='Foundation v8.12 active'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();statusBadge.textContent='Foundation v8.13 active'}
 function renderWorkspace(redraw=true){const rows=allocRows();holdsWorkspace.innerHTML=rows.map(holdCard).join('');rows.forEach(r=>{document.getElementById('range_'+r.idx).addEventListener('input',e=>{allocations[r.h.name]=lengthForBlocks(Number(e.target.value));activeHold=r.idx;renderSelectors();recomputeFrom(r.idx)});document.getElementById('card_'+r.idx).addEventListener('click',()=>{activeHold=r.idx;renderSelectors();renderWorkspace()})});renderSummary()}
 function holdCard(r){const maxB=maxBlocks(r.h);const pct=maxB?(r.blocks/maxB*100):0;const loadedBlocks=r.p.valid?Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock)):0;const warn=r.p.warnings.length?`<div class="hint warn">⚠ ${r.p.warnings.join(' ')}</div>`:'';const err=r.p.errors&&r.p.errors.length?`<div class="hint bad">❌ ${r.p.errors.join(' ')}</div>`:'';const badge=r.p.valid?`<span class="validBadge">${r.p.status}</span>`:`<span class="invalidBadge">INVALID</span>`;const planClass=r.p.valid?'plan':'plan invalid';const planContent=r.p.valid?`<div class="rows">${makeRows(r.p,loadedBlocks,maxB)}</div><div class="marker" style="left:calc(10px + (100% - 20px)*${pct/100})"><div class="marker-label">${r.length.toFixed(2)} m | ${r.coils} coils | ${r.weight.toFixed(1)} t</div></div>`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the pattern is physically possible.</span></div>`;return `<div class="hold-card ${r.idx===activeHold?'active':''} ${r.p.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="${planClass}">${planContent}</div><div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}" ${r.p.valid?'':'disabled'}><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>${err}${warn}<div class="section">${sectionSvg(r.p)}</div></div></div>`}
 function makeLaneRow(cls,label,blocks,maxB){let s='<div class="row">';for(let k=0;k<maxB;k++)s+=`<div class="block ${k<blocks?cls:'free'}" style="flex:1">${k<blocks?label:''}</div>`;return s+'</div>'}
 function makeRows(p,blocks,maxB){
   if(!p.valid) return '';
-  const ordered=[...p.coils].sort((a,b)=>a.x-b.x || ({bottom:0,upper:1,wedge:2}[a.type]-{bottom:0,upper:1,wedge:2}[b.type]));
+  const g=geometryEngine(p);
+  const ordered=[...g.coils].sort((a,b)=>a.x-b.x || ({bottom:0,upper:1,wedge:2}[a.type]-{bottom:0,upper:1,wedge:2}[b.type]));
   return ordered.map(c=>makeLaneRow(c.type,c.id,blocks,maxB)).join('');
 }
 function sectionSvg(p){
   if(!p.valid) return `<div class="invalidBox"><div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">${(p.errors||[]).join(' ')}</span></div></div>`;
+  const g=geometryEngine(p);
   const W=760,H=190,margin=45;
-  const minX=Math.min(...p.coils.map(c=>c.x-c.diameter/2),-p.W/2), maxX=Math.max(...p.coils.map(c=>c.x+c.diameter/2),p.W/2);
-  const span=Math.max(maxX-minX,p.W,1);
+  const minX=Math.min(...g.coils.map(c=>c.x-c.diameter/2),-g.W/2), maxX=Math.max(...g.coils.map(c=>c.x+c.diameter/2),g.W/2);
+  const span=Math.max(maxX-minX,g.W,1);
   const scale=Math.min((W-2*margin)/span,42);
   const base=142;
   function sx(x){return W/2 + x*scale}
   function sy(y,d){return base - y*scale}
   let svg=`<svg viewBox="0 0 ${W} ${H}"><rect x="20" y="20" width="${W-40}" height="${H-35}" rx="12" fill="#f8fafc" stroke="#cbd5e1"/><line x1="30" y1="${base+p.D*scale/2}" x2="${W-30}" y2="${base+p.D*scale/2}" stroke="#0f172a" stroke-width="3"/><line x1="${W/2}" y1="28" x2="${W/2}" y2="${H-30}" stroke="#94a3b8" stroke-dasharray="4 4"/><text x="${W/2}" y="18" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section · Bottom ${p.port}+${p.stbd} · Upper ${p.upPReq}+${p.upSReq} manual · Wedge ${p.wedge} ${wedgeMode==='auto'?'auto':'manual'} · groups ${p.groups?p.groups.join('+'):''}</text>`;
-  p.coils.forEach(c=>{
+  g.coils.forEach(c=>{
     const r=c.diameter*scale/2;
     const color=c.type==='bottom'?'#16a34a':c.type==='upper'?'#2563eb':'#f4c430';
     const ink=c.type==='wedge'?'#111827':'#fff';
     svg+=`<circle cx="${sx(c.x)}" cy="${sy(c.y)}" r="${r}" fill="${color}" stroke="#0f172a" stroke-width="1.5"/><text x="${sx(c.x)}" y="${sy(c.y)+4}" text-anchor="middle" fill="${ink}" font-weight="900" font-size="${Math.max(9,r*.45)}">${c.id}</text>`;
   });
-  svg+=`<text x="${W/2}" y="${H-8}" text-anchor="middle" fill="#64748b" font-size="11">Geometry output is produced once by the Width Arrangement Engine. Renderers do not recalculate stowage.</text></svg>`;return svg;
+  svg+=`<text x="${W/2}" y="${H-8}" text-anchor="middle" fill="#64748b" font-size="11">Geometry output is produced once by the Geometry Engine. Renderers do not recalculate stowage.</text></svg>`;return svg;
 }
-function renderSummary(){const rows=allocRows();const allocatedCoils=rows.reduce((s,r)=>s+r.coils,0),allocatedWt=rows.reduce((s,r)=>s+r.weight,0),allocatedLen=rows.reduce((s,r)=>s+r.length,0);const rem=Math.max(0,cargo.coils-allocatedCoils);summaryBox.innerHTML=`<div class="statgrid"><div class="stat"><b>Total coils</b><span>${cargo.coils}</span></div><div class="stat"><b>Total weight</b><span>${cargo.totalWeight.toFixed(1)} t</span></div><div class="stat"><b>Allocated</b><span>${allocatedWt.toFixed(1)} t</span></div><div class="stat"><b>Length used</b><span>${allocatedLen.toFixed(2)} m</span></div><div class="stat"><b>Remaining coils</b><span class="${rem?'warn':'ok'}">${rem}</span></div><div class="stat"><b>Remaining weight</b><span class="${rem?'warn':'ok'}">${(rem*avgT()).toFixed(1)} t</span></div></div><table><thead><tr><th>Hold</th><th>Length</th><th>Blocks</th><th>Coils</th><th>Weight</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.idx===activeHold?'activeRow':''}"><td>${r.h.name}</td><td>${r.length.toFixed(2)} m</td><td>${r.blocks}</td><td>${r.coils}</td><td>${r.weight.toFixed(1)} t</td></tr>`).join('')}</tbody></table><div class="hint">Cargo source: ${cargoSource==='list'?'Cargo List':'Simulation'}. Bottom row: ${bottomMode.toUpperCase()}. Upper row: MANUAL (${upperPort.value}+${upperStbd.value}). SCWAE + Validation + Upper Support Engine active.</div>`}
+function renderSummary(){const rows=allocRows();const allocatedCoils=rows.reduce((s,r)=>s+r.coils,0),allocatedWt=rows.reduce((s,r)=>s+r.weight,0),allocatedLen=rows.reduce((s,r)=>s+r.length,0);const rem=Math.max(0,cargo.coils-allocatedCoils);summaryBox.innerHTML=`<div class="statgrid"><div class="stat"><b>Total coils</b><span>${cargo.coils}</span></div><div class="stat"><b>Total weight</b><span>${cargo.totalWeight.toFixed(1)} t</span></div><div class="stat"><b>Allocated</b><span>${allocatedWt.toFixed(1)} t</span></div><div class="stat"><b>Length used</b><span>${allocatedLen.toFixed(2)} m</span></div><div class="stat"><b>Remaining coils</b><span class="${rem?'warn':'ok'}">${rem}</span></div><div class="stat"><b>Remaining weight</b><span class="${rem?'warn':'ok'}">${(rem*avgT()).toFixed(1)} t</span></div></div><table><thead><tr><th>Hold</th><th>Length</th><th>Blocks</th><th>Coils</th><th>Weight</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.idx===activeHold?'activeRow':''}"><td>${r.h.name}</td><td>${r.length.toFixed(2)} m</td><td>${r.blocks}</td><td>${r.coils}</td><td>${r.weight.toFixed(1)} t</td></tr>`).join('')}</tbody></table><div class="hint">Cargo source: ${cargoSource==='list'?'Cargo List':'Simulation'}. Bottom row: ${bottomMode.toUpperCase()}. Upper row: MANUAL (${upperPort.value}+${upperStbd.value}). SCWAE + Validation + Geometry Engine active.</div>`}
 async function importCargo(){const f=cargoFile.files[0];if(!f){alert('Choose cargo file first');return}cargoSource='list';setCargoMode();fileState.textContent=f.name;try{const fd=new FormData();fd.append('cargo_file',f);const res=await fetch('/import-cargo',{method:'POST',body:fd});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Import failed');cargo.coils=data.coil_count;cargo.totalWeight=data.total_weight_t;cargo.avgWeight=data.avg_weight_t||data.total_weight_t/data.coil_count;cargo.avgWidth=data.avg_width_m||1.2;cargo.avgDiameter=data.avg_diameter_m||null;avgWeight.value=cargo.avgWeight.toFixed(2);avgWidth.value=cargo.avgWidth.toFixed(2);if(cargo.avgDiameter){avgDiameter.value=cargo.avgDiameter.toFixed(3);diaHint.textContent='Diameter source: cargo list average '+cargo.avgDiameter.toFixed(3)+' m.'}else diaHint.textContent='No Diameter column found. Enter average diameter manually.';cargo.rows=data.coils||[];cargoPreview.innerHTML=`<b>${data.filename}</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Avg width ${cargo.avgWidth.toFixed(2)} m ${cargo.avgDiameter?'· Avg diameter '+cargo.avgDiameter.toFixed(2)+' m':'· diameter manual'}<table><thead><tr><th>ID</th><th>Weight</th><th>Width</th><th>Diam.</th></tr></thead><tbody>${cargo.rows.slice(0,8).map(c=>`<tr><td>${c.ID}</td><td>${Number(c.Weight_t).toFixed(1)}</td><td>${Number(c.Width_m).toFixed(2)}</td><td>${c.Diameter_m?Number(c.Diameter_m).toFixed(2):'-'}</td></tr>`).join('')}</tbody></table>`;statusBadge.textContent='Cargo imported';allocations={};build()}catch(e){cargoPreview.innerHTML='<span class="bad">'+e.message+'</span>'}}
 function setCargoMode(){cargoListMode.classList.toggle('active',cargoSource==='list');simulationMode.classList.toggle('active',cargoSource==='sim');cargoListPanel.style.display=cargoSource==='list'?'block':'none';simulationPanel.style.display=cargoSource==='sim'?'block':'none'}
 function setBottomMode(){bottomAutoBtn.classList.toggle('active',bottomMode==='auto');bottomManualBtn.classList.toggle('active',bottomMode==='manual');bottomManualBox.style.display=bottomMode==='manual'?'grid':'none'}function setWedgeMode(){wedgeAutoBtn.classList.toggle('active',wedgeMode==='auto');wedgeManualBtn.classList.toggle('active',wedgeMode==='manual');wedgeManualBox.style.display=wedgeMode==='manual'?'block':'none'}
