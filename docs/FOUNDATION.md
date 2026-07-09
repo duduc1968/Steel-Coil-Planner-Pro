@@ -99,7 +99,7 @@ No modifications are allowed unless a real operational bug is discovered.
 
 Foundation Milestone 2
 
-- Allocation Engine---
+- Allocation Engine
 
 ## Foundation Status
 
