@@ -104,6 +104,8 @@ Foundation Milestone 2
 - Professional PDF Reports
 - 3D Cargo View
 
+---
+
 ## Foundation Status
 
 **Current State:** CODE FREEZE
@@ -113,6 +115,6 @@ This foundation shall remain unchanged unless a real operational bug is identifi
 Last Updated: 09 July 2026
 
 
----
+
 
 © Steel Coil Planner Pro – by Gabriel Duduc
