@@ -1,4 +1,9 @@
 # Steel Coil Planner Pro – by Gabriel Duduc
+Created:
+09 July 2026
+
+Approved by:
+Gabriel Duduc
 
 # FOUNDATION MILESTONE 1
 
