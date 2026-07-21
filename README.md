@@ -1,3 +1,10 @@
+
+## v9.0 Phase 1 — Shared Zone Model
+
+The v9 controlled refactor has started. Cargo Zones and Stowage Workspace now share the same selected-zone identity, lifecycle display, information card, and synchronized highlighting. Validated foundation engines remain unchanged.
+
+See `docs/V9_PHASE_1_SHARED_ZONE_MODEL.md`.
+
 # Steel Coil Planner Pro v8.19 – Allocation Bidirectional Fix
 
 This build fixes bidirectional cargo allocation between holds.
