@@ -35,3 +35,7 @@ Stowage Workspace now shows cargo-zone indicators above each hold. The plan view
 
 ## v9.1 — Zone Manager
 Cargo zones are now persistent operational objects with cargo type, notes, lifecycle, lock state and audit timestamps. Existing zones are migrated automatically. Validated stowage engines remain unchanged.
+
+## v9.3 Progressive Cargo Planning
+
+See `docs/MILESTONE_3_PROGRESSIVE_CARGO_PLANNING_v9_3.md`.
