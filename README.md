@@ -16,7 +16,7 @@ Moving the marker on any hold now causes all other holds to recalculate from the
 
 
 
-## v8.24 – Full-Width Zone Indicators in Stowage Workspace
-- Cargo-zone indicators in every hold now span the full visual breadth of the hold top view.
-- Zone overlays remain aligned to their exact longitudinal From–To positions.
-- Coil rows are rendered above a light transparent zone overlay for clarity.
+## v8.24 – Full-Width Cargo Zone Selection
+- Based on v8.23.
+- Cargo Zone selection overlays now span the full transverse width of each hold plan view.
+- Stowage Workspace remains unchanged from v8.23.
