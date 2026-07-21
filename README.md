@@ -32,3 +32,6 @@ Moving the marker on any hold now causes all other holds to recalculate from the
 ## v8.25 — Realistic Stowage Top View
 
 Stowage Workspace now shows cargo-zone indicators above each hold. The plan view uses the full port-to-starboard hold width and includes fore, aft, port, starboard, and centreline references. Exact zone positions from Cargo Zones are preserved.
+
+## v9.1 — Zone Manager
+Cargo zones are now persistent operational objects with cargo type, notes, lifecycle, lock state and audit timestamps. Existing zones are migrated automatically. Validated stowage engines remain unchanged.
