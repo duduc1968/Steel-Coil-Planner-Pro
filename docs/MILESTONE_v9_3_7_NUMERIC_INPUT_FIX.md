@@ -1,0 +1,1 @@
+Fix spinner arrows incrementing continuously by excluding browser spinner interactions from auto-select logic.

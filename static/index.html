@@ -27,7 +27,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.3.6</span></h1><span>Progressive Cargo Planning · Intelligent Hold Selection</span></div></div><div class="ver">v9.3.6</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.3.7</span></h1><span>Progressive Cargo Planning · Numeric Input Fix</span></div></div><div class="ver">v9.3.7</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -398,7 +398,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.3.6 · Intelligent Hold Selection'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.3.7 · Numeric Input Fix'}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -699,18 +699,27 @@ fleetBtn.onclick=()=>{fleetModal.style.display='flex';renderFleet();fillFleetFor
 // v9.3.3 UI polish: clear visual affordance and fast numeric entry.
 // Any enabled numeric field selects its entire value on mouse click or keyboard focus,
 // so a default 0 can be replaced immediately without Backspace/Ctrl+A.
+let scpSpinnerInteraction=false;
+document.addEventListener('pointerdown',e=>{
+ const el=e.target;
+ if(el instanceof HTMLInputElement&&el.type==='number'){
+   const r=el.getBoundingClientRect();
+   scpSpinnerInteraction=e.clientX>=r.right-24;
+ } else scpSpinnerInteraction=false;
+});
 document.addEventListener('focusin',e=>{
   const el=e.target;
-  if(el instanceof HTMLInputElement&&el.type==='number'&&!el.disabled&&!el.readOnly){
+  if(el instanceof HTMLInputElement&&el.type==='number'&&!el.disabled&&!el.readOnly&&!scpSpinnerInteraction){
     requestAnimationFrame(()=>el.select());
   }
 });
 document.addEventListener('mouseup',e=>{
   const el=e.target;
-  if(el instanceof HTMLInputElement&&el.type==='number'&&!el.disabled&&!el.readOnly){
-    e.preventDefault();
-    el.select();
-  }
+  if(!(el instanceof HTMLInputElement)||el.type!=='number'||el.disabled||el.readOnly)return;
+  const r=el.getBoundingClientRect();
+  const spinZone=r.right-24;
+  if(e.clientX>=spinZone)return; // don't interfere with browser spinner arrows
+  requestAnimationFrame(()=>el.select());
 });
 // Enter from the active zone's editable weight/tolerance field runs Optimize Preview.
 document.addEventListener('keydown',e=>{
