@@ -86,10 +86,14 @@
 .cross-hold-svg .hold-shell{fill:#f8fafc;stroke:#334155;stroke-width:5;stroke-linejoin:round}
 .cross-hold-svg .tank-top{stroke:#0f172a;stroke-width:4}
 
+
+/* v9.4.4 — hard zone clipping: cargo blocks cannot render outside their assigned zone. */
+.plan-real .lane-zone-clip{position:absolute;top:0;bottom:0;overflow:hidden;pointer-events:none}
+.plan-real .lane-zone-clip .block{pointer-events:auto}
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.3</span></h1><span>Progressive Cargo Planning · Shared Longitudinal Canvas</span></div></div><div class="ver">v9.4.3</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.4</span></h1><span>Progressive Cargo Planning · Zone-Clipped Stowage</span></div></div><div class="ver">v9.4.4</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -460,7 +464,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.3 · Shared Longitudinal Canvas'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.4 · Zone-Clipped Stowage'}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -739,34 +743,50 @@ function makeLaneRow(cls,label,blocks,maxB,holdName,h){
   const holdLength=Math.max(.01,n(h&&h.length,0));
   const pitch=Math.max(.01,blockLen());
   const hasZones=h&&zonesForHold(h).length>0;
-  const placements=[];
+  let s='<div class="row">';
+
   if(hasZones){
     let manifestBlock=1;
     optimizedZonesForHold(h).forEach(z=>{
-      const used=Math.min(Math.max(0,n(z.result&&z.result.allocatedLength,0)),Math.max(0,z.end-z.start));
+      const zoneStart=clamp(n(z.start,0),0,holdLength);
+      const zoneEnd=clamp(n(z.end,zoneStart),zoneStart,holdLength);
+      const zoneLength=Math.max(0,zoneEnd-zoneStart);
+      const allocated=Math.max(0,n(z.result&&z.result.allocatedLength,0));
+      const used=Math.min(allocated,zoneLength);
+      if(used<=1e-9||zoneLength<=1e-9)return;
+
+      const clipLeftPct=100*zoneStart/holdLength;
+      const clipWidthPct=100*zoneLength/holdLength;
+      s+=`<div class="lane-zone-clip" data-lane-zone="${z.id}" style="left:${clipLeftPct}%;width:${clipWidthPct}%">`;
+
       const count=Math.ceil(used/pitch-1e-9);
       for(let j=0;j<count;j++){
-        const left=z.start+j*pitch;
-        const width=Math.min(pitch,Math.max(0,z.start+used-left));
-        if(width>1e-9)placements.push({left,width,loaded:true,zone:z,block:manifestBlock++});
+        const localLeft=j*pitch;
+        const width=Math.min(pitch,Math.max(0,used-localLeft));
+        if(width<=1e-9)continue;
+        const blockNo=manifestBlock++;
+        const item=getManifestItem(holdName,blockNo,label);
+        const sel=item&&item.key===selectedCoilKey;
+        const attrs=item?` data-coil-key="${item.key}" title="${escapeHtml(item.id)} · ${item.weight.toFixed(1)} t · ${escapeHtml(z.name||'Zone')}"`:'';
+        const leftPct=100*localLeft/zoneLength;
+        const widthPct=100*width/zoneLength;
+        s+=`<div class="block ${cls} ${sel?'coil-selected':''} ${item?'coil-block':''}"${attrs} style="left:${leftPct}%;width:${widthPct}%">${label}</div>`;
       }
+      s+='</div>';
     });
   }else{
     for(let k=0;k<maxB;k++){
       const left=k*pitch;
       const width=Math.min(pitch,Math.max(0,holdLength-left));
-      if(width>1e-9)placements.push({left,width,loaded:k<blocks,zone:null,block:k+1});
+      if(width<=1e-9)continue;
+      const item=k<blocks?getManifestItem(holdName,k+1,label):null;
+      const sel=item&&item.key===selectedCoilKey;
+      const attrs=item?` data-coil-key="${item.key}" title="${escapeHtml(item.id)} · ${item.weight.toFixed(1)} t"`:'';
+      const leftPct=100*left/holdLength;
+      const widthPct=100*width/holdLength;
+      s+=`<div class="block ${k<blocks?cls:'free'} ${sel?'coil-selected':''} ${item?'coil-block':''}"${attrs} style="left:${leftPct}%;width:${widthPct}%">${k<blocks?label:''}</div>`;
     }
   }
-  let s='<div class="row">';
-  placements.forEach(x=>{
-    const item=x.loaded?getManifestItem(holdName,x.block,label):null;
-    const sel=item&&item.key===selectedCoilKey;
-    const attrs=item?` data-coil-key="${item.key}" title="${escapeHtml(item.id)} · ${item.weight.toFixed(1)} t${x.zone?' · '+escapeHtml(x.zone.name||'Zone'):''}"`:'';
-    const leftPct=100*x.left/holdLength;
-    const widthPct=100*x.width/holdLength;
-    s+=`<div class="block ${x.loaded?cls:'free'} ${sel?'coil-selected':''} ${item?'coil-block':''}"${attrs} style="left:${leftPct}%;width:${widthPct}%">${x.loaded?label:''}</div>`;
-  });
   return s+'</div>';
 }
 function makeRows(p,blocks,maxB,holdName,h){
