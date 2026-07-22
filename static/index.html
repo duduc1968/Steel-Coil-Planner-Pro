@@ -55,6 +55,22 @@
 .plan-real .block{position:absolute;top:0;bottom:0;margin:0;border-radius:3px;min-width:0;overflow:hidden}
 .plan-real .metric-grid{left:0;right:0}
 
+/* v9.4.3 — Shared Longitudinal Canvas */
+/* Zone strip, hold grid, coil rows and engineering ruler use the same 0–100% AFT/FORE axis. */
+.longitudinal-canvas{position:relative;width:100%;padding:0;margin:0}
+.longitudinal-canvas .stowage-zone-strip-wrap{width:100%;margin:0 0 7px}
+.plan-real .rows,.plan-real .metric-grid,.plan-real .engineering-ruler{left:0;right:0}
+.plan-real .engineering-ruler{position:absolute;bottom:0;height:24px;border-top:1px solid #94a3b8;background:rgba(248,250,252,.94);z-index:7;pointer-events:none}
+.engineering-ruler .engineering-tick{position:absolute;bottom:2px;transform:translateX(-50%);font-size:8px;font-weight:900;color:#475569;white-space:nowrap}
+.engineering-ruler .engineering-tick:before{content:'';position:absolute;left:50%;bottom:12px;height:6px;border-left:1px solid #64748b}
+.engineering-ruler .engineering-tick.first{transform:none}
+.engineering-ruler .engineering-tick.first:before{left:0}
+.engineering-ruler .engineering-tick.last{transform:translateX(-100%)}
+.engineering-ruler .engineering-tick.last:before{left:100%}
+.plan-real .zone-footprint{position:absolute;top:23px;bottom:35px;border-left:1px dashed rgba(30,64,175,.55);border-right:1px dashed rgba(30,64,175,.55);background:rgba(59,130,246,.035);z-index:1;pointer-events:none}
+.plan-real .rows{z-index:3}
+.plan-real .metric-grid{z-index:0}
+
 /* v9.4.1 — Engineering Scale Corrections */
 .zone-hold-frame{position:relative;width:calc(100% - 28px);margin:14px;overflow:visible}
 .zone-hold-frame .zone-hold{width:100%;margin:0;overflow:hidden}
@@ -73,7 +89,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.2</span></h1><span>Progressive Cargo Planning · True Longitudinal Scale Rendering</span></div></div><div class="ver">v9.4.2</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.3</span></h1><span>Progressive Cargo Planning · Shared Longitudinal Canvas</span></div></div><div class="ver">v9.4.3</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -444,7 +460,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.2 · True Longitudinal Scale Rendering'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.3 · Shared Longitudinal Canvas'}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -702,7 +718,22 @@ function zonePointerUp(e){const d=zoneDrag;if(!d)return;d.el.removeEventListener
 function setWorkspaceMode(mode){workspaceMode=mode;zonesTab.classList.toggle('active',mode==='zones');cargoPoolTab.classList.toggle('active',mode==='pool');stowageTab.classList.toggle('active',mode==='stowage');zoneWorkspace.style.display=mode==='zones'?'block':'none';cargoPoolWorkspace.style.display=mode==='pool'?'block':'none';holdsWorkspace.style.display=mode==='stowage'?'block':'none';workspaceTitle.textContent=mode==='zones'?'Cargo Allocation by Zone':mode==='pool'?'Cargo Pool & Reservations':'Multi-Hold Stowage Workspace';if(mode==='zones')renderZoneWorkspace();else if(mode==='pool')renderCargoPool();else renderWorkspace()}
 
 function renderWorkspace(redraw=true){const rows=allocRows();const displayRows=rows.slice().reverse();holdsWorkspace.innerHTML=sharedZoneCard()+gridControl()+displayRows.map(holdCard).join('');rows.forEach(r=>{const rangeEl=document.getElementById('range_'+r.idx);if(rangeEl)rangeEl.addEventListener('input',e=>{allocations[r.h.name]=lengthForBlocks(Number(e.target.value));activeHold=r.idx;renderSelectors();recomputeFrom(r.idx)});document.getElementById('card_'+r.idx).addEventListener('click',e=>{if(e.target.closest('.coil-block')||e.target.closest('.coil-circle'))return;activeHold=r.idx;renderSelectors();renderWorkspace()})});document.querySelectorAll('[data-coil-key]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();selectCoil(el.dataset.coilKey)}));document.querySelectorAll('[data-stowage-zone]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();selectedZoneId=el.dataset.stowageZone;activeHold=findZoneHold(selectedZoneId);saveCargoZones();setWorkspaceMode('zones');setTimeout(()=>document.querySelector(`[data-zone="${selectedZoneId}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),20)}));bindGridControls();renderSummary();renderCargoManager();renderCoilInspector()}
-function holdCard(r){const maxB=maxBlocks(r.h);const hasZones=zonesForHold(r.h).length>0;const loadedBlocks=r.p.valid?Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock)):0;const warn=r.p.warnings.length?`<div class="hint warn">⚠ ${r.p.warnings.join(' ')}</div>`:'';const err=r.p.errors&&r.p.errors.length?`<div class="hint bad">❌ ${r.p.errors.join(' ')}</div>`:'';const badge=r.p.valid?`<span class="validBadge">${r.p.status}</span>`:`<span class="invalidBadge">INVALID</span>`;const planClass=r.p.valid?'plan plan-real':'plan invalid';const zoneStrip=hasZones?`<div class="stowage-zone-strip-wrap"><div class="stowage-zone-strip-title"><span>AFT · Cargo zones</span><span>FORE →</span></div>${stowageZoneMap(r.h)}</div>`:'';const planContent=r.p.valid?`${metricGrid(r.h,false)}<div class="hold-axis"></div><span class="fore-label">FORE</span><span class="aft-label">AFT</span><div class="rows">${makeRows(r.p,loadedBlocks,maxB,r.h.name,r.h)}</div>`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the pattern is physically possible.</span></div>`;const control=hasZones?`<div class="range-wrap"><span>AFT 0 m</span><output style="flex:1;text-align:center;color:#166534">Zone-controlled stowage · exact selected positions</output><span>FORE ${n(r.h.length).toFixed(2)} m</span></div>`:`<div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}" ${r.p.valid?'':'disabled'}><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>`;return `<div class="hold-card ${r.idx===activeHold?'active':''} ${r.p.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="stowage-plan-stack"><div class="hold-boundary-wrap"><span class="side-label port">PORT</span><span class="side-label starboard">STARBOARD</span>${zoneStrip}<div class="${planClass}">${planContent}</div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(r.p)}</div></div></div>`}
+function engineeringRuler(h){
+  const length=Math.max(.01,n(h&&h.length,0));
+  const step=gridStepForHold(h);
+  const ticks=[`<span class="engineering-tick first" style="left:0">0 m</span>`];
+  for(let m=step;m<length-.001;m+=step)ticks.push(`<span class="engineering-tick" style="left:${100*m/length}%">${m}</span>`);
+  ticks.push(`<span class="engineering-tick last" style="left:100%">${Number.isInteger(length)?length:length.toFixed(1)} m</span>`);
+  return `<div class="engineering-ruler">${ticks.join('')}</div>`;
+}
+function stowageZoneFootprints(h){
+  return optimizedZonesForHold(h).map(z=>{
+    const left=100*z.start/Math.max(.01,h.length);
+    const width=100*(z.end-z.start)/Math.max(.01,h.length);
+    return `<div class="zone-footprint" style="left:${left}%;width:${width}%" title="${escapeHtml(zoneLabel(h,z))}: ${z.start.toFixed(2)}–${z.end.toFixed(2)} m"></div>`;
+  }).join('');
+}
+function holdCard(r){const maxB=maxBlocks(r.h);const hasZones=zonesForHold(r.h).length>0;const loadedBlocks=r.p.valid?Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock)):0;const warn=r.p.warnings.length?`<div class="hint warn">⚠ ${r.p.warnings.join(' ')}</div>`:'';const err=r.p.errors&&r.p.errors.length?`<div class="hint bad">❌ ${r.p.errors.join(' ')}</div>`:'';const badge=r.p.valid?`<span class="validBadge">${r.p.status}</span>`:`<span class="invalidBadge">INVALID</span>`;const planClass=r.p.valid?'plan plan-real':'plan invalid';const zoneStrip=hasZones?`<div class="stowage-zone-strip-wrap"><div class="stowage-zone-strip-title"><span>AFT · Cargo zones</span><span>FORE →</span></div>${stowageZoneMap(r.h)}</div>`:'';const planContent=r.p.valid?`${metricGrid(r.h,false)}${stowageZoneFootprints(r.h)}<div class="hold-axis"></div><span class="fore-label">FORE</span><span class="aft-label">AFT</span><div class="rows">${makeRows(r.p,loadedBlocks,maxB,r.h.name,r.h)}</div>${engineeringRuler(r.h)}`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the pattern is physically possible.</span></div>`;const control=hasZones?`<div class="range-wrap"><span>AFT 0 m</span><output style="flex:1;text-align:center;color:#166534">Zone-controlled stowage · exact selected positions</output><span>FORE ${n(r.h.length).toFixed(2)} m</span></div>`:`<div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}" ${r.p.valid?'':'disabled'}><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>`;return `<div class="hold-card ${r.idx===activeHold?'active':''} ${r.p.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="stowage-plan-stack"><div class="hold-boundary-wrap"><span class="side-label port">PORT</span><span class="side-label starboard">STARBOARD</span><div class="longitudinal-canvas">${zoneStrip}<div class="${planClass}">${planContent}</div></div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(r.p)}</div></div></div>`}
 function getManifestItem(holdName,block,positionId){return stowageManifest().find(x=>x.hold===holdName&&x.block===block&&x.positionId===positionId)}
 function makeLaneRow(cls,label,blocks,maxB,holdName,h){
   const holdLength=Math.max(.01,n(h&&h.length,0));
