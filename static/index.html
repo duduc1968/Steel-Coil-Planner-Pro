@@ -59,7 +59,7 @@
 .stowage-longitudinal-boundary .side-label.aft{left:3px;transform:translateY(-50%);writing-mode:horizontal-tb}
 .stowage-longitudinal-boundary .side-label.fore{right:0;transform:translateY(-50%);writing-mode:horizontal-tb}
 
-/* v9.4.0.10 — Restored engineering ruler and hold statistics */
+/* v9.4.0.11 — Restored engineering ruler and hold statistics */
 .stowage-zone-strip-wrap{margin:0 10px 9px;box-sizing:border-box}
 .stowage-zone-map,.stowage-dimension-ruler{width:100%;box-sizing:border-box}
 .stowage-dimension-head{display:flex;justify-content:space-between;align-items:center;margin:5px 0 2px;color:#475569;font-size:9px;font-weight:900;letter-spacing:.035em;text-transform:uppercase}
@@ -74,14 +74,14 @@
 .hold-stat.free{border-color:#cbd5e1;background:#f8fafc;color:#475569}
 @media(max-width:720px){.stowage-dimension-segment{font-size:8px}.stowage-dimension-head{font-size:8px}}
 
-/* v9.4.0.10 — Exact longitudinal renderer audit fix */
+/* v9.4.0.11 — Exact longitudinal renderer audit fix */
 .plan-real .rows{left:0;right:0;top:23px;bottom:35px;gap:2px}
 .plan-real .row{position:relative;display:block;overflow:hidden;background:repeating-linear-gradient(90deg,#e5e7eb 0,#e5e7eb calc(var(--cell-pct,7.5%) - 1px),#cbd5e1 calc(var(--cell-pct,7.5%) - 1px),#cbd5e1 var(--cell-pct,7.5%));border-top:1px solid rgba(148,163,184,.35);border-bottom:1px solid rgba(148,163,184,.2)}
 .plan-real .row .block.absolute-block{position:absolute;top:0;bottom:0;height:auto;min-width:0;border-radius:3px;display:grid;place-items:center;z-index:3}
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.0.10</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v9.4.0.10</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.0.11</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v9.4.0.11</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -452,7 +452,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.0.10 · Exact Renderer + Engineering Ruler'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.0.11 · Exact Renderer + Engineering Ruler'}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -755,18 +755,23 @@ function sectionSvg(p){
   if(!p.valid) return `<div class="invalidBox"><div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">${(p.errors||[]).join(' ')}</span></div></div>`;
   const g=geometryEngine(p);
   const W=760,H=190,margin=45;
-  const minX=Math.min(...g.coils.map(c=>c.x-c.diameter/2),-g.W/2), maxX=Math.max(...g.coils.map(c=>c.x+c.diameter/2),g.W/2);
-  const span=Math.max(maxX-minX,g.W,1);
-  const scale=Math.min((W-2*margin)/span,42);
+  // Cross Section is intentionally schematic: preserve the existing hold outline,
+  // but fit the side walls to the outer faces of the extreme cargo coils.
+  const cargoMinX=Math.min(...g.coils.map(c=>c.x-c.diameter/2));
+  const cargoMaxX=Math.max(...g.coils.map(c=>c.x+c.diameter/2));
+  const cargoSpan=Math.max(cargoMaxX-cargoMinX,1);
+  const cargoCenter=(cargoMinX+cargoMaxX)/2;
+  const scale=Math.min((W-2*margin)/cargoSpan,42);
   const base=142;
-  function sx(x){return W/2 + x*scale}
+  function sx(x){return W/2 + (x-cargoCenter)*scale}
   function sy(y,d){return base - y*scale}
+  const leftWall=sx(cargoMinX), rightWall=sx(cargoMaxX);
   let svg=`<svg class="cross-hold-svg" viewBox="0 0 ${W} ${H+28}">
   <text x="${W/2}" y="16" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section · Bottom ${p.port}+${p.stbd} · Upper ${p.upPReq}+${p.upSReq} manual · Wedge ${p.wedge} ${wedgeMode==='auto'?'auto':'manual'}</text>
   <text x="13" y="${base/2}" text-anchor="middle" transform="rotate(-90 13 ${base/2})" fill="#334155" font-size="10" font-weight="900">PORT</text>
   <text x="${W-13}" y="${base/2}" text-anchor="middle" transform="rotate(90 ${W-13} ${base/2})" fill="#334155" font-size="10" font-weight="900">STARBOARD</text>
-  <path d="M 34 34 L 34 ${base+p.D*scale/2} Q 34 ${base+p.D*scale/2+10} 44 ${base+p.D*scale/2+10} L ${W-44} ${base+p.D*scale/2+10} Q ${W-34} ${base+p.D*scale/2+10} ${W-34} ${base+p.D*scale/2} L ${W-34} 34" fill="#f8fafc" stroke="#334155" stroke-width="5"/>
-  <line x1="34" y1="${base+p.D*scale/2}" x2="${W-34}" y2="${base+p.D*scale/2}" stroke="#0f172a" stroke-width="4"/>
+  <path d="M ${leftWall} 34 L ${leftWall} ${base+p.D*scale/2} Q ${leftWall} ${base+p.D*scale/2+10} ${leftWall+10} ${base+p.D*scale/2+10} L ${rightWall-10} ${base+p.D*scale/2+10} Q ${rightWall} ${base+p.D*scale/2+10} ${rightWall} ${base+p.D*scale/2} L ${rightWall} 34" fill="#f8fafc" stroke="#334155" stroke-width="5"/>
+  <line x1="${leftWall}" y1="${base+p.D*scale/2}" x2="${rightWall}" y2="${base+p.D*scale/2}" stroke="#0f172a" stroke-width="4"/>
   <line x1="${W/2}" y1="30" x2="${W/2}" y2="${H-30}" stroke="#94a3b8" stroke-dasharray="4 4"/>
   <text x="${W/2}" y="${base+p.D*scale/2+24}" text-anchor="middle" fill="#475569" font-size="10" font-weight="900">TANK TOP</text>
   <text x="${W/2}" y="30" text-anchor="middle" fill="#475569" font-size="10" font-weight="900">HATCH OPENING</text>`;
