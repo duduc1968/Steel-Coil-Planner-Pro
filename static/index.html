@@ -454,7 +454,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.0.5 · Engineering Ruler Alignment'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.0.6 · Hold 1 Zone/Ruler Alignment Fix'}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -629,8 +629,12 @@ function syncHoldZonesToStowage(holdIndex){
   if(workspaceMode==='stowage')renderWorkspace(false);
 }
 function stowageZoneMap(h){
-  const zs=zonesForHold(h); if(!zs.length)return '';
-  return `<div class="stowage-zone-map">${zs.map(z=>{const left=100*z.start/h.length,width=100*(z.end-z.start)/h.length;const cls=z.result?z.result.status:'';const focus=selectedZoneId?(z.id===selectedZoneId?'zone-selected':'zone-dim'):'';return `<div class="stowage-zone-segment ${cls} ${focus}" data-stowage-zone="${z.id}" style="left:${left}%;width:${width}%">${escapeHtml(zoneLabel(h,z))} · ${z.start.toFixed(1)}–${z.end.toFixed(1)} m · ${n(z.weight,0).toFixed(0)} t</div>`}).join('')}</div>`;
+  /* UI-006A: render the zone strip from the same loaded extents used by the engineering ruler.
+     This removes the Hold 1 offset caused by drawing the strip from draft start/end while the
+     ruler was drawn from optimized start/allocatedLength. */
+  const extents=loadedZoneExtents(h); if(!extents.length)return '';
+  const L=Math.max(.001,n(h.length,0));
+  return `<div class="stowage-zone-map">${extents.map(x=>{const z=x.z;const left=100*x.start/L,width=100*x.length/L;const cls=z.result?z.result.status:'';const focus=selectedZoneId?(z.id===selectedZoneId?'zone-selected':'zone-dim'):'';return `<div class="stowage-zone-segment ${cls} ${focus}" data-stowage-zone="${z.id}" style="left:${left}%;width:${width}%">${escapeHtml(zoneLabel(h,z))} · ${x.start.toFixed(2)}–${x.end.toFixed(2)} m · ${n(z.weight,0).toFixed(0)} t</div>`}).join('')}</div>`;
 }
 function loadedZoneExtents(h){
   return optimizedZonesForHold(h).map(z=>{
