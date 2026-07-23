@@ -59,14 +59,29 @@
 .stowage-longitudinal-boundary .side-label.aft{left:3px;transform:translateY(-50%);writing-mode:horizontal-tb}
 .stowage-longitudinal-boundary .side-label.fore{right:0;transform:translateY(-50%);writing-mode:horizontal-tb}
 
-/* v9.4.0.9 — Exact longitudinal renderer audit fix */
+/* v9.4.0.10 — Restored engineering ruler and hold statistics */
+.stowage-zone-strip-wrap{margin:0 10px 9px;box-sizing:border-box}
+.stowage-zone-map,.stowage-dimension-ruler{width:100%;box-sizing:border-box}
+.stowage-dimension-head{display:flex;justify-content:space-between;align-items:center;margin:5px 0 2px;color:#475569;font-size:9px;font-weight:900;letter-spacing:.035em;text-transform:uppercase}
+.stowage-dimension-ruler{position:relative;height:43px;border-left:2px solid #475569;border-right:2px solid #475569;background:#f8fafc;overflow:visible}
+.stowage-dimension-segment{position:absolute;top:0;height:100%;border-left:1px solid #64748b;border-right:1px solid #64748b;display:flex;justify-content:center;align-items:flex-start;padding-top:4px;font-size:9px;font-weight:900;color:#334155;white-space:nowrap;box-sizing:border-box}
+.stowage-dimension-segment:after{content:'';position:absolute;left:4px;right:4px;top:24px;border-top:1px solid #64748b}
+.stowage-dimension-segment:before{content:'↔';position:absolute;left:50%;top:17px;transform:translateX(-50%);color:#64748b;font-size:13px;line-height:1}
+.stowage-dimension-segment.loaded{background:rgba(37,99,235,.10);color:#1d4ed8;border-color:#2563eb}
+.stowage-dimension-segment.gap{background:rgba(226,232,240,.68)}
+.hold-stats{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;margin-top:4px}
+.hold-stat{display:inline-flex;align-items:center;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:999px;padding:3px 8px;font-size:9px;font-weight:900}
+.hold-stat.free{border-color:#cbd5e1;background:#f8fafc;color:#475569}
+@media(max-width:720px){.stowage-dimension-segment{font-size:8px}.stowage-dimension-head{font-size:8px}}
+
+/* v9.4.0.10 — Exact longitudinal renderer audit fix */
 .plan-real .rows{left:0;right:0;top:23px;bottom:35px;gap:2px}
 .plan-real .row{position:relative;display:block;overflow:hidden;background:repeating-linear-gradient(90deg,#e5e7eb 0,#e5e7eb calc(var(--cell-pct,7.5%) - 1px),#cbd5e1 calc(var(--cell-pct,7.5%) - 1px),#cbd5e1 var(--cell-pct,7.5%));border-top:1px solid rgba(148,163,184,.35);border-bottom:1px solid rgba(148,163,184,.2)}
 .plan-real .row .block.absolute-block{position:absolute;top:0;bottom:0;height:auto;min-width:0;border-radius:3px;display:grid;place-items:center;z-index:3}
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.0.9</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v9.4.0.9</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.0.10</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v9.4.0.10</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -437,7 +452,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.0.9 · Exact Longitudinal Renderer'}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';cargoPreview.innerHTML=`<b>Simulation Mode</b><br>${cargo.coils} coils · ${cargo.totalWeight.toFixed(1)} t<br>Width ${avgW().toFixed(2)} m · Diameter ${dia().toFixed(2)} m · Weight ${avgT().toFixed(1)} t`}initAllocations();if(Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent='v9.4.0.10 · Exact Renderer + Engineering Ruler'}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -611,9 +626,30 @@ function syncHoldZonesToStowage(holdIndex){
   renderSummary();
   if(workspaceMode==='stowage')renderWorkspace(false);
 }
+function stowageZoneRange(h,z){
+  const start=clamp(n(z.start,0),0,n(h.length,0));
+  const selectedLength=Math.max(0,n(z.end,0)-start);
+  const optimizedLength=z.result&&z.result.status!=='impossible'?n(z.result.allocatedLength,z.result.requiredLength):0;
+  const length=Math.max(0,optimizedLength>0?Math.min(selectedLength||optimizedLength,optimizedLength):selectedLength);
+  const end=clamp(start+length,start,n(h.length,0));
+  return {start,end,length:end-start};
+}
 function stowageZoneMap(h){
-  const zs=zonesForHold(h); if(!zs.length)return '';
-  return `<div class="stowage-zone-map">${zs.map(z=>{const left=100*z.start/h.length,width=100*(z.end-z.start)/h.length;const cls=z.result?z.result.status:'';const focus=selectedZoneId?(z.id===selectedZoneId?'zone-selected':'zone-dim'):'';return `<div class="stowage-zone-segment ${cls} ${focus}" data-stowage-zone="${z.id}" style="left:${left}%;width:${width}%">${escapeHtml(zoneLabel(h,z))} · ${z.start.toFixed(1)}–${z.end.toFixed(1)} m · ${n(z.weight,0).toFixed(0)} t</div>`}).join('')}</div>`;
+  const zs=zonesForHold(h).filter(z=>z.result&&z.result.status!=='impossible').slice().sort((a,b)=>a.start-b.start); if(!zs.length)return '';
+  return `<div class="stowage-zone-map">${zs.map(z=>{const r=stowageZoneRange(h,z),left=100*r.start/h.length,width=100*r.length/h.length;const cls=z.result?z.result.status:'';const focus=selectedZoneId?(z.id===selectedZoneId?'zone-selected':'zone-dim'):'';return `<div class="stowage-zone-segment ${cls} ${focus}" data-stowage-zone="${z.id}" style="left:${left}%;width:${width}%">${escapeHtml(zoneLabel(h,z))} · ${r.start.toFixed(1)}–${r.end.toFixed(1)} m · ${n(z.result&&z.result.allocated,z.weight).toFixed(0)} t</div>`}).join('')}</div>`;
+}
+function stowageDimensionData(h){
+  const ranges=zonesForHold(h).filter(z=>z.result&&z.result.status!=='impossible').map(z=>({...stowageZoneRange(h,z),z})).filter(r=>r.length>.0001).sort((a,b)=>a.start-b.start);
+  const segments=[];let cursor=0;
+  ranges.forEach(r=>{if(r.start>cursor+.0001)segments.push({type:'gap',start:cursor,end:r.start,length:r.start-cursor});segments.push({type:'loaded',start:r.start,end:r.end,length:r.length,z:r.z});cursor=Math.max(cursor,r.end)});
+  if(cursor<h.length-.0001)segments.push({type:'gap',start:cursor,end:h.length,length:h.length-cursor});
+  const merged=[];ranges.forEach(r=>{const last=merged[merged.length-1];if(last&&r.start<=last.end+.0001)last.end=Math.max(last.end,r.end);else merged.push({start:r.start,end:r.end})});
+  const occupied=merged.reduce((a,r)=>a+r.end-r.start,0),free=Math.max(0,h.length-occupied);
+  return {segments,occupied,free};
+}
+function stowageDimensionRuler(h){
+  const d=stowageDimensionData(h);
+  return `<div class="stowage-dimension-head"><span>AFT · 0.00 m</span><span>Loaded-zone lengths and remaining distances</span><span>${h.length.toFixed(2)} m · FORE</span></div><div class="stowage-dimension-ruler">${d.segments.map(s=>{const left=100*s.start/h.length,width=100*s.length/h.length;return `<div class="stowage-dimension-segment ${s.type}" style="left:${left}%;width:${width}%" title="${s.type==='loaded'?'Loaded zone':'Free distance'} ${s.length.toFixed(2)} m"><span>${s.length.toFixed(2)} m</span></div>`}).join('')}</div>`;
 }
 function optimizedZonesForHold(h){return zonesForHold(h).filter(z=>z.validated&&z.result&&z.result.status!=='impossible').slice().sort((a,b)=>a.start-b.start)}
 function zoneLoadedAt(h,metres){
@@ -684,7 +720,7 @@ function zonePointerUp(e){const d=zoneDrag;if(!d)return;d.el.removeEventListener
 function setWorkspaceMode(mode){workspaceMode=mode;zonesTab.classList.toggle('active',mode==='zones');cargoPoolTab.classList.toggle('active',mode==='pool');stowageTab.classList.toggle('active',mode==='stowage');zoneWorkspace.style.display=mode==='zones'?'block':'none';cargoPoolWorkspace.style.display=mode==='pool'?'block':'none';holdsWorkspace.style.display=mode==='stowage'?'block':'none';workspaceTitle.textContent=mode==='zones'?'Cargo Allocation by Zone':mode==='pool'?'Cargo Pool & Reservations':'Multi-Hold Stowage Workspace';if(mode==='zones')renderZoneWorkspace();else if(mode==='pool')renderCargoPool();else renderWorkspace()}
 
 function renderWorkspace(redraw=true){const rows=allocRows();const displayRows=rows.slice().reverse();holdsWorkspace.innerHTML=sharedZoneCard()+gridControl()+displayRows.map(holdCard).join('');rows.forEach(r=>{const rangeEl=document.getElementById('range_'+r.idx);if(rangeEl)rangeEl.addEventListener('input',e=>{allocations[r.h.name]=lengthForBlocks(Number(e.target.value));activeHold=r.idx;renderSelectors();recomputeFrom(r.idx)});document.getElementById('card_'+r.idx).addEventListener('click',e=>{if(e.target.closest('.coil-block')||e.target.closest('.coil-circle'))return;activeHold=r.idx;renderSelectors();renderWorkspace()})});document.querySelectorAll('[data-coil-key]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();selectCoil(el.dataset.coilKey)}));document.querySelectorAll('[data-stowage-zone]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();selectedZoneId=el.dataset.stowageZone;activeHold=findZoneHold(selectedZoneId);saveCargoZones();setWorkspaceMode('zones');setTimeout(()=>document.querySelector(`[data-zone="${selectedZoneId}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),20)}));bindGridControls();renderSummary();renderCargoManager();renderCoilInspector()}
-function holdCard(r){const maxB=maxBlocks(r.h);const hasZones=zonesForHold(r.h).length>0;const loadedBlocks=r.p.valid?Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock)):0;const warn=r.p.warnings.length?`<div class="hint warn">⚠ ${r.p.warnings.join(' ')}</div>`:'';const err=r.p.errors&&r.p.errors.length?`<div class="hint bad">❌ ${r.p.errors.join(' ')}</div>`:'';const badge=r.p.valid?`<span class="validBadge">${r.p.status}</span>`:`<span class="invalidBadge">INVALID</span>`;const planClass=r.p.valid?'plan plan-real':'plan invalid';const zoneStrip=hasZones?`<div class="stowage-zone-strip-wrap"><div class="stowage-zone-strip-title"><span>AFT · Cargo zones</span><span>FORE →</span></div>${stowageZoneMap(r.h)}</div>`:'';const planContent=r.p.valid?`${metricGrid(r.h,false)}<div class="hold-axis"></div><div class="rows">${makeRows(r.p,loadedBlocks,maxB,r.h.name,r.h)}</div>`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the pattern is physically possible.</span></div>`;const control=hasZones?`<div class="range-wrap"><span>AFT 0 m</span><output style="flex:1;text-align:center;color:#166534">Zone-controlled stowage · exact selected positions</output><span>FORE ${n(r.h.length).toFixed(2)} m</span></div>`:`<div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}" ${r.p.valid?'':'disabled'}><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>`;return `<div class="hold-card ${r.idx===activeHold?'active':''} ${r.p.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div></div><div class="hold-body"><div class="stowage-plan-stack">${zoneStrip}<div class="hold-boundary-wrap stowage-longitudinal-boundary"><span class="side-label aft">AFT</span><span class="side-label fore">FORE</span><div class="${planClass}">${planContent}</div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(r.p)}</div></div></div>`}
+function holdCard(r){const maxB=maxBlocks(r.h);const hasZones=zonesForHold(r.h).some(z=>z.result&&z.result.status!=='impossible');const loadedBlocks=r.p.valid?Math.ceil(r.coils/Math.max(1,r.p.coilsPerBlock)):0;const warn=r.p.warnings.length?`<div class="hint warn">⚠ ${r.p.warnings.join(' ')}</div>`:'';const err=r.p.errors&&r.p.errors.length?`<div class="hint bad">❌ ${r.p.errors.join(' ')}</div>`:'';const badge=r.p.valid?`<span class="validBadge">${r.p.status}</span>`:`<span class="invalidBadge">INVALID</span>`;const planClass=r.p.valid?'plan plan-real':'plan invalid';const dim=hasZones?stowageDimensionData(r.h):{occupied:0,free:r.h.length};const occPct=r.h.length?100*dim.occupied/r.h.length:0,freePct=100-occPct;const stats=hasZones?`<div class="hold-stats"><span class="hold-stat">Occupied ${dim.occupied.toFixed(2)} m · ${occPct.toFixed(1)}%</span><span class="hold-stat free">Free ${dim.free.toFixed(2)} m · ${freePct.toFixed(1)}%</span></div>`:'';const zoneStrip=hasZones?`<div class="stowage-zone-strip-wrap"><div class="stowage-zone-strip-title"><span>AFT · Cargo zones</span><span>FORE →</span></div>${stowageZoneMap(r.h)}${stowageDimensionRuler(r.h)}</div>`:'';const planContent=r.p.valid?`${metricGrid(r.h,false)}<div class="hold-axis"></div><div class="rows">${makeRows(r.p,loadedBlocks,maxB,r.h.name,r.h)}</div>`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the pattern is physically possible.</span></div>`;const control=hasZones?`<div class="range-wrap"><span>AFT 0 m</span><output style="flex:1;text-align:center;color:#166534">Zone-controlled stowage · exact selected positions</output><span>FORE ${n(r.h.length).toFixed(2)} m</span></div>`:`<div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}" ${r.p.valid?'':'disabled'}><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>`;return `<div class="hold-card ${r.idx===activeHold?'active':''} ${r.p.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div><div class="hold-summary">${r.length.toFixed(2)} m · ${r.blocks} blocks · ${r.coils} coils · ${r.weight.toFixed(1)} t</div>${stats}</div></div><div class="hold-body"><div class="stowage-plan-stack">${zoneStrip}<div class="hold-boundary-wrap stowage-longitudinal-boundary"><span class="side-label aft">AFT</span><span class="side-label fore">FORE</span><div class="${planClass}">${planContent}</div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(r.p)}</div></div></div>`}
 function getManifestItem(holdName,block,positionId){return stowageManifest().find(x=>x.hold===holdName&&x.block===block&&x.positionId===positionId)}
 function makeLaneRow(cls,label,blocks,maxB,holdName,h){
   const hasZones=h&&optimizedZonesForHold(h).length>0;
