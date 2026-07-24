@@ -59,7 +59,7 @@
 .stowage-longitudinal-boundary .side-label.aft{left:3px;transform:translateY(-50%);writing-mode:horizontal-tb}
 .stowage-longitudinal-boundary .side-label.fore{right:0;transform:translateY(-50%);writing-mode:horizontal-tb}
 
-/* v9.4.0.13 — Restored engineering ruler and hold statistics */
+/* v9.4.0.14 — Restored engineering ruler and hold statistics */
 .stowage-zone-strip-wrap{margin:0 10px 9px;box-sizing:border-box}
 .stowage-zone-map,.stowage-dimension-ruler{width:100%;box-sizing:border-box}
 .stowage-dimension-head{display:flex;justify-content:space-between;align-items:center;margin:5px 0 2px;color:#475569;font-size:9px;font-weight:900;letter-spacing:.035em;text-transform:uppercase}
@@ -74,14 +74,14 @@
 .hold-stat.free{border-color:#cbd5e1;background:#f8fafc;color:#475569}
 @media(max-width:720px){.stowage-dimension-segment{font-size:8px}.stowage-dimension-head{font-size:8px}}
 
-/* v9.4.0.13 — Exact longitudinal renderer audit fix */
+/* v9.4.0.14 — Exact longitudinal renderer audit fix */
 .plan-real .rows{left:0;right:0;top:23px;bottom:35px;gap:2px}
 .plan-real .row{position:relative;display:block;overflow:hidden;background:repeating-linear-gradient(90deg,#e5e7eb 0,#e5e7eb calc(var(--cell-pct,7.5%) - 1px),#cbd5e1 calc(var(--cell-pct,7.5%) - 1px),#cbd5e1 var(--cell-pct,7.5%));border-top:1px solid rgba(148,163,184,.35);border-bottom:1px solid rgba(148,163,184,.2)}
 .plan-real .row .block.absolute-block{position:absolute;top:0;bottom:0;height:auto;min-width:0;border-radius:3px;display:grid;place-items:center;z-index:3}
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.0.13</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v9.4.0.13</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v9.4.0.14</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v9.4.0.14</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -494,7 +494,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v9.4.0.13 · Previous session restored':'v9.4.0.13 · Persistent Session';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v9.4.0.14 · Previous session restored':'v9.4.0.14 · Persistent Session';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -838,6 +838,58 @@ function cargoRows(){
   const count=Math.max(0,i(simCoils.value,cargo.coils||0));
   return Array.from({length:count},(_,idx)=>({sourceIndex:idx+1,id:'SIM-'+String(idx+1).padStart(3,'0'),weight:avgT(),width:avgW(),diameter:dia(),grade:'Simulation'}));
 }
+
+/* OPT-001 Selection Engine: homogeneous bottom rows, compatible smaller wedge, light upper row. */
+function coilMetric(c,key,fallback){const v=Number(c&&c[key]);return Number.isFinite(v)?v:fallback}
+function averageMetric(items,key,fallback){return items.length?items.reduce((sum,c)=>sum+coilMetric(c,key,fallback),0)/items.length:fallback}
+function selectHomogeneousBottom(pool,count){
+  if(count<=0)return [];
+  const candidates=[...pool];
+  if(candidates.length<=count)return candidates;
+  // Examine diameter-sorted windows. First minimize diameter spread, then prefer
+  // the larger average diameter, heavier average weight and larger average width.
+  const sorted=candidates.sort((a,b)=>coilMetric(b,'diameter',dia())-coilMetric(a,'diameter',dia()));
+  let best=null;
+  for(let start=0;start<=sorted.length-count;start++){
+    const window=sorted.slice(start,start+count);
+    const ds=window.map(c=>coilMetric(c,'diameter',dia()));
+    const spread=Math.max(...ds)-Math.min(...ds);
+    const score={window,spread,avgD:averageMetric(window,'diameter',dia()),avgWgt:averageMetric(window,'weight',avgT()),avgWidth:averageMetric(window,'width',avgW())};
+    if(!best || score.spread<best.spread-1e-9 ||
+      (Math.abs(score.spread-best.spread)<1e-9 && score.avgD>best.avgD+1e-9) ||
+      (Math.abs(score.spread-best.spread)<1e-9 && Math.abs(score.avgD-best.avgD)<1e-9 && score.avgWgt>best.avgWgt+1e-9) ||
+      (Math.abs(score.spread-best.spread)<1e-9 && Math.abs(score.avgD-best.avgD)<1e-9 && Math.abs(score.avgWgt-best.avgWgt)<1e-9 && score.avgWidth>best.avgWidth)) best=score;
+  }
+  return (best?best.window:sorted.slice(0,count)).sort((a,b)=>coilMetric(b,'diameter',dia())-coilMetric(a,'diameter',dia()) || coilMetric(b,'weight',avgT())-coilMetric(a,'weight',avgT()) || coilMetric(b,'width',avgW())-coilMetric(a,'width',avgW()));
+}
+function selectCompatibleWedge(pool,bottom,count){
+  if(count<=0||!pool.length)return [];
+  const targetD=averageMetric(bottom,'diameter',dia()),targetW=averageMetric(bottom,'width',avgW()),targetT=averageMetric(bottom,'weight',avgT());
+  const ranked=[...pool].sort((a,b)=>{
+    const ad=coilMetric(a,'diameter',dia()),bd=coilMetric(b,'diameter',dia());
+    const aOversize=ad>targetD?1:0,bOversize=bd>targetD?1:0; // smaller/equal is preferred
+    if(aOversize!==bOversize)return aOversize-bOversize;
+    const as=Math.abs(ad-targetD)/Math.max(targetD,.001)+.35*Math.abs(coilMetric(a,'width',avgW())-targetW)/Math.max(targetW,.001)+.2*Math.abs(coilMetric(a,'weight',avgT())-targetT)/Math.max(targetT,.001);
+    const bs=Math.abs(bd-targetD)/Math.max(targetD,.001)+.35*Math.abs(coilMetric(b,'width',avgW())-targetW)/Math.max(targetW,.001)+.2*Math.abs(coilMetric(b,'weight',avgT())-targetT)/Math.max(targetT,.001);
+    return as-bs;
+  });
+  return ranked.slice(0,count);
+}
+function arrangeBlockCoils(source,positions){
+  const pool=[...source],byType={bottom:[],wedge:[],upper:[]};
+  positions.forEach(p=>(byType[p.type]||(byType[p.type]=[])).push(p));
+  const bottom=selectHomogeneousBottom(pool,byType.bottom.length);
+  const used=new Set(bottom);
+  const afterBottom=pool.filter(c=>!used.has(c));
+  const wedge=selectCompatibleWedge(afterBottom,bottom,byType.wedge.length);
+  wedge.forEach(c=>used.add(c));
+  const upper=pool.filter(c=>!used.has(c)).sort((a,b)=>coilMetric(a,'weight',avgT())-coilMetric(b,'weight',avgT()) || coilMetric(a,'diameter',dia())-coilMetric(b,'diameter',dia()) || coilMetric(a,'width',avgW())-coilMetric(b,'width',avgW())).slice(0,byType.upper.length);
+  upper.forEach(c=>used.add(c));
+  const leftovers=pool.filter(c=>!used.has(c));
+  const queues={bottom:[...bottom],wedge:[...wedge],upper:[...upper]};
+  return positions.map(pos=>(queues[pos.type]&&queues[pos.type].length?queues[pos.type].shift():leftovers.shift())).filter(Boolean);
+}
+
 function stowageManifest(skipPoolStatus=false){
   const src=cargoRows();
   const rows=allocRows();
@@ -858,9 +910,10 @@ function stowageManifest(skipPoolStatus=false){
         let placedInZone=0, longitudinalCursor=z.start;
         for(let localBlock=0;localBlock<groups.length;localBlock++){
           const group=groups[localBlock];
-          const blockWidth=Math.max(.01,...group.map(c=>Math.max(.01,n(c.width,avgW()))));
-          for(let pi=0;pi<positions.length&&pi<group.length;pi++){
-            const pos=positions[pi],base=group[pi]; placedInZone++;
+          const arrangedGroup=arrangeBlockCoils(group,positions);
+          const blockWidth=Math.max(.01,...arrangedGroup.map(c=>Math.max(.01,n(c.width,avgW()))));
+          for(let pi=0;pi<positions.length&&pi<arrangedGroup.length;pi++){
+            const pos=positions[pi],base=arrangedGroup[pi]; placedInZone++;
             out.push({...base,key:'Z'+z.id+'_'+placedInZone,hold:r.h.name,holdIndex:r.idx,block:localBlock+1,localBlock:localBlock+1,blockStart:longitudinalCursor,blockWidth,zoneId:z.id,zoneName:z.name||'Zone',zoneStart:z.start,zoneEnd:z.end,positionId:pos.id,tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side});
           }
           longitudinalCursor+=blockWidth;
@@ -871,9 +924,13 @@ function stowageManifest(skipPoolStatus=false){
       return;
     }
     for(let b=1;b<=r.blocks;b++){
-      for(const pos of positions){
-        if(cursor>=src.length || out.length>=cargo.coils || out.filter(x=>x.hold===r.h.name).length>=r.coils) break;
-        const base=src[cursor++];
+      const holdPlaced=out.filter(x=>x.hold===r.h.name).length;
+      const remainingForHold=Math.max(0,r.coils-holdPlaced);
+      const take=Math.min(positions.length,remainingForHold,src.length-cursor);
+      const blockSource=src.slice(cursor,cursor+take);
+      const arrangedBlock=arrangeBlockCoils(blockSource,positions);
+      for(let pi=0;pi<positions.length&&pi<arrangedBlock.length;pi++){
+        const pos=positions[pi],base=arrangedBlock[pi]; cursor++;
         out.push({...base,key:'K'+cursor,hold:r.h.name,holdIndex:r.idx,block:b,positionId:pos.id,tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side});
       }
     }
