@@ -1,5 +1,6 @@
 import pandas as pd
 from .geometry import positions_for_pattern, PATTERN_LABELS
+from .row_builder import build_complete_rows
 
 TIER_WEIGHT_KEYS = {
     "Bottom": "Bottom_t",
@@ -105,19 +106,22 @@ def make_plan(cargo_df: pd.DataFrame, cfg: dict):
     x = 0.30
     block_no = 1
 
-    for start in range(0, len(cargo), cap):
-        group = cargo.iloc[start:start + cap]
+    build_result = build_complete_rows(cargo, positions)
+    cfg["remaining_coils"] = build_result.remaining[[
+        c for c in ["ID", "Width_m", "Weight_t", "Diameter_m", "Size_Group"]
+        if c in build_result.remaining.columns
+    ]].to_dict("records")
+
+    for group in build_result.rows:
         block_len = float(group["Width_m"].max())
-
-        block_positions = _balanced_positions_for_count(positions, len(group))
-
-        for (_, coil), pos in zip(group.iterrows(), block_positions):
+        for (_, coil), pos in zip(group.iterrows(), positions):
             tier, pos_name, y, z = pos
             row = {
                 "Block": block_no,
                 "ID": str(coil["ID"]),
                 "Tier": tier,
                 "Position": pos_name,
+                "Size_Group": str(coil.get("Size_Group", "")),
                 "Width_m": float(coil["Width_m"]),
                 "Weight_t": float(coil["Weight_t"]),
                 "x0_m": x,
@@ -165,6 +169,9 @@ def summary(plan: pd.DataFrame, cfg: dict):
         "warnings": warnings,
         "max_stack_height_m": max_z,
         "blocks": int(plan["Block"].max()) if len(plan) else 0,
+        "complete_rows": int(plan["Block"].max()) if len(plan) else 0,
+        "remaining_coil_count": len(cfg.get("remaining_coils", [])),
+        "remaining_weight_t": float(sum(c.get("Weight_t", 0) for c in cfg.get("remaining_coils", []))),
         "stowage_pattern": pattern_key,
         "stowage_pattern_label": cfg.get("stowage_pattern_label") or PATTERN_LABELS.get(pattern_key, pattern_key),
         "planning_diameter_m": max_d,

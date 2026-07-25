@@ -219,6 +219,8 @@ async def calculate(
             **s,
             "block_weights": block_weight_summary(plan),
             "coils": plan.to_dict("records"),
+            "remaining_coils": cfg.get("remaining_coils", []),
+            "row_builder_version": "V10.0.0.1",
             "hold": {
                 "width_m": cfg["hold_width_m"],
                 "length_m": cfg["hold_length_m"],
