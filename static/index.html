@@ -153,8 +153,8 @@ if(restoredSession){
   cargoFileName=restoredSession.cargoFileName||'';
 }
 let sessionSaveTimer=null;
-function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.0.0.1',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,upperPort:upperPort?.value,upperStbd:upperStbd?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
-function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.0.0.1',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
+function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.0.0.2',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,upperPort:upperPort?.value,upperStbd:upperStbd?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
+function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.0.0.2',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
 function saveSessionNow(){try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()));localStorage.removeItem(LEGACY_SESSION_KEY)}catch(e){console.warn('Session metadata save failed',e)}writeVoyageSnapshot(voyageSnapshot())}
 function saveSession(){clearTimeout(sessionSaveTimer);sessionSaveTimer=setTimeout(saveSessionNow,120)}
 function renderCargoPreview(restored=false){
@@ -216,7 +216,24 @@ async function restoreVoyageFromDatabase(){
   restoredSession={...(restoredSession||{}),...snap,ui:snap.ui||restoredSession?.ui||{}};
   return true;
 }
-async function startNewVoyage(){if(!confirm('Start a new voyage? Ship Library and hold dimensions will be kept. Cargo list, zones, reservations and stowage plan will be cleared.'))return;allocations={};cargoZones={};selectedZoneId=null;selectedZoneByHold={};selectedCoilKey=null;cargoFileName='';cargoSource='list';cargo={coils:0,totalWeight:0,avgWeight:20,avgWidth:1.2,avgDiameter:null,rows:[]};localStorage.removeItem('scp_cargo_zones_v821');localStorage.removeItem('scp_selected_zone_v9');localStorage.removeItem(CARGO_ZONES_STATE_KEY);await deleteVoyageSnapshot();fileState.textContent='No file';restoredCargoName.style.display='none';restoredCargoName.textContent='';statusBadge.textContent='New voyage';renderSelectors();setCargoMode();build();saveSessionNow()}
+async function startNewVoyage(){
+ if(!confirm('Start a new voyage? Ship Library and hold dimensions will be kept. Cargo list, zones, reservations and stowage plan will be cleared.'))return;
+ // Stop a delayed save from restoring the voyage that is being deleted.
+ clearTimeout(sessionSaveTimer);sessionSaveTimer=null;
+ allocations={};cargoZones={};selectedZoneId=null;selectedZoneByHold={};selectedCoilKey=null;cargoFileName='';cargoSource='list';
+ cargo={coils:0,totalWeight:0,avgWeight:20,avgWidth:1.2,avgDiameter:null,rows:[]};
+ localStorage.removeItem('scp_cargo_zones_v821');localStorage.removeItem('scp_selected_zone_v9');localStorage.removeItem(CARGO_ZONES_STATE_KEY);localStorage.removeItem(SESSION_KEY);localStorage.removeItem(LEGACY_SESSION_KEY);
+ await deleteVoyageSnapshot();
+ if(cargoFile)cargoFile.value='';
+ fileState.textContent='No file';restoredCargoName.style.display='none';restoredCargoName.textContent='';
+ cargoPreview.innerHTML='<div class="hint">Import cargo or use Simulation Mode.</div>';
+ cargoManager.innerHTML='<div class="hint">Import cargo or use Simulation Mode.</div>';
+ coilInspector.innerHTML='<div class="hint">Select a coil from the list, Top View, or Cross Section.</div>';
+ statusBadge.textContent='New voyage';renderSelectors();setCargoMode();build();
+ // Persist only the clean voyage state, after all old stores have been deleted.
+ try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()))}catch(e){console.warn('Clean voyage metadata save failed',e)}
+ await writeVoyageSnapshot(voyageSnapshot());
+}
 window.addEventListener('beforeunload',saveSessionNow);
 function readCargoZonesState(){try{const state=JSON.parse(localStorage.getItem(CARGO_ZONES_STATE_KEY));if(state&&state.zones&&typeof state.zones==='object')return state}catch(e){}return null}
 function loadCargoZones(){const state=readCargoZonesState();if(state)return state.zones;try{return JSON.parse(localStorage.getItem('scp_cargo_zones_v821'))||{}}catch(e){return {}}}
@@ -245,8 +262,21 @@ function packedCargoLength(coils,coilsPerBlock){
  for(let k=0;k<coils.length;k+=cp){const group=coils.slice(k,k+cp);length+=Math.max(...group.map(c=>Math.max(.01,n(c.width,avgW()))));blocks++;}
  return length+Math.max(0,blocks-1)*Math.max(0,n(rowGap.value,.15));
 }
+function completeRowsOnly(coils,coilsPerBlock){
+ const cp=Math.max(1,i(coilsPerBlock,1));
+ const completeCount=Math.floor(coils.length/cp)*cp;
+ return coils.slice(0,completeCount);
+}
 function fitCargoToLength(coils,coilsPerBlock,availableLength){
- const out=[];for(const c of coils){const trial=out.concat(c);if(packedCargoLength(trial,coilsPerBlock)<=availableLength+1e-9)out.push(c);else break;}return out;
+ const cp=Math.max(1,i(coilsPerBlock,1));
+ const out=[];
+ // Test and commit one COMPLETE row at a time. A partial final row is never
+ // reserved by the automatic planner; its coils remain in Remaining Cargo.
+ for(let start=0;start+cp<=coils.length;start+=cp){
+   const row=coils.slice(start,start+cp),trial=out.concat(row);
+   if(packedCargoLength(trial,cp)<=availableLength+1e-9)out.push(...row);else break;
+ }
+ return out;
 }
 function freeIntervals(h){
  const zs=zonesForHold(h).slice().sort((a,b)=>a.start-b.start);const out=[];let cursor=0;
@@ -289,7 +319,11 @@ function optimizeCargoZone(h,z){
    for(const c of sorted){const trial=selected.concat(c);const ns=sum+c.weight;if(ns<=target+tol||sum<target-tol){selected=trial;sum=ns;if(Math.abs(sum-target)<=tol)break;}}
    let improved=true,loops=0;while(improved&&loops++<5){improved=false;const used=new Set(selected.map(x=>x.id));let best=Math.abs(target-sum),choice=null;for(let si=0;si<selected.length;si++){for(const c of candidates){if(used.has(c.id))continue;const ns=sum-selected[si].weight+c.weight,err=Math.abs(target-ns);if(err+1e-9<best){best=err;choice={si,c,ns}}}}if(choice){selected[choice.si]=choice.c;sum=choice.ns;improved=true}}
  }
- const requiredLength=packedCargoLength(selected,p.coilsPerBlock),blocks=Math.ceil(selected.length/Math.max(1,p.coilsPerBlock)),diff=sum-target,within=mode==='fixed_length'||Math.abs(diff)<=tol,fit=requiredLength<=usable+1e-9;
+ // Automatic planning may commit only complete rows. Any tentative partial
+ // row is rolled back and remains available in Remaining Cargo.
+ selected=completeRowsOnly(selected,p.coilsPerBlock);
+ sum=selected.reduce((a,c)=>a+c.weight,0);
+ const requiredLength=packedCargoLength(selected,p.coilsPerBlock),blocks=selected.length/Math.max(1,p.coilsPerBlock),diff=sum-target,within=mode==='fixed_length'||Math.abs(diff)<=tol,fit=requiredLength<=usable+1e-9;
  if(mode==='required_weight'){
    // Required-weight mode calculates and draws the zone length automatically.
    // It may grow only into free longitudinal space and never overlap another zone.
