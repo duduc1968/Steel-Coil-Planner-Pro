@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.0.0.1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.0.0.1</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.0.0.3</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.0.0.3</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -153,8 +153,8 @@ if(restoredSession){
   cargoFileName=restoredSession.cargoFileName||'';
 }
 let sessionSaveTimer=null;
-function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.0.0.2',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,upperPort:upperPort?.value,upperStbd:upperStbd?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
-function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.0.0.2',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
+function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.0.0.3',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,upperPort:upperPort?.value,upperStbd:upperStbd?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
+function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.0.0.3',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
 function saveSessionNow(){try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()));localStorage.removeItem(LEGACY_SESSION_KEY)}catch(e){console.warn('Session metadata save failed',e)}writeVoyageSnapshot(voyageSnapshot())}
 function saveSession(){clearTimeout(sessionSaveTimer);sessionSaveTimer=setTimeout(saveSessionNow,120)}
 function renderCargoPreview(restored=false){
@@ -584,7 +584,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.0.0.1 · Previous session restored':'v10.0.0.1 · Local Unlock';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.0.0.3 · Previous session restored':'v10.0.0.3 · Local Unlock';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){

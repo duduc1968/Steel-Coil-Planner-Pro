@@ -41,3 +41,53 @@ def test_bwu_roles_are_assigned_by_position_strength():
     upper = row.iloc[7:]
     assert bottom['Weight_t'].mean() >= upper['Weight_t'].mean()
     assert wedge['Width_m'].iloc[0] <= row['Width_m'].max()
+
+
+def test_same_group_is_preferred_before_adjacent_group():
+    df = pd.DataFrame({
+        'ID': [f'L{i}' for i in range(11)] + [f'M{i}' for i in range(11)],
+        'Width_m': [1.20] * 22,
+        'Weight_t': [18.0] * 11 + [14.0] * 11,
+        'Diameter_m': [1.60] * 22,
+    })
+    result = build_complete_rows(df, POSITIONS)
+    assert len(result.rows) == 2
+    assert set(result.rows[0]['Size_Group']) == {'Large'}
+    assert set(result.rows[1]['Size_Group']) == {'Medium Large'}
+
+
+def test_adjacent_group_completes_a_row_but_extreme_group_does_not():
+    adjacent = pd.DataFrame({
+        'ID': [f'XL{i}' for i in range(8)] + [f'L{i}' for i in range(3)],
+        'Width_m': [1.2] * 11,
+        'Weight_t': [22.0] * 8 + [18.0] * 3,
+        'Diameter_m': [1.6] * 11,
+    })
+    result = build_complete_rows(adjacent, POSITIONS)
+    assert len(result.rows) == 1
+    assert result.rows[0]['Mixed_Adjacent_Group'].all()
+
+    extreme = pd.DataFrame({
+        'ID': [f'XL{i}' for i in range(8)] + [f'LT{i}' for i in range(3)],
+        'Width_m': [1.2] * 11,
+        'Weight_t': [22.0] * 8 + [4.0] * 3,
+        'Diameter_m': [1.6] * 11,
+    })
+    result = build_complete_rows(extreme, POSITIONS)
+    assert len(result.rows) == 0
+    assert len(result.remaining) == 11
+
+
+def test_intelligent_grouping_selects_tight_dimension_cluster():
+    # Twelve Large coils are available for an eleven-coil row. One outlier is
+    # deliberately much wider/smaller in diameter and should remain outside.
+    df = pd.DataFrame({
+        'ID': [f'C{i}' for i in range(11)] + ['OUTLIER'],
+        'Width_m': [1.20 + (i % 2) * 0.01 for i in range(11)] + [1.80],
+        'Weight_t': [18.0 + (i % 3) * 0.1 for i in range(11)] + [18.0],
+        'Diameter_m': [1.60 + (i % 2) * 0.01 for i in range(11)] + [1.20],
+    })
+    result = build_complete_rows(df, POSITIONS)
+    assert len(result.rows) == 1
+    assert 'OUTLIER' not in set(result.rows[0]['ID'])
+    assert result.remaining['ID'].tolist() == ['OUTLIER']

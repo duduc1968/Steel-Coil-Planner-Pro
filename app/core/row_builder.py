@@ -1,12 +1,12 @@
-"""V10 Row Builder Core.
+"""V10 intelligent cargo grouping and complete-row builder.
 
-Builds complete transverse rows from a cargo list using the Master's
-operational rules:
-- start from the largest weight group;
-- keep each row approximately homogeneous;
-- use an adjacent group when needed to complete a row;
-- assign B/W/U as temporary row roles, not permanent cargo classes;
-- leave cargo that cannot form another complete row as Remaining Coils.
+Operational principles:
+- start with the largest available weight group;
+- form approximately homogeneous rows, not mathematically identical rows;
+- prefer the same group and use only an adjacent group when needed;
+- never mix non-adjacent extreme groups automatically;
+- assign B/W/U as temporary positions inside each completed row;
+- leave cargo that cannot form another acceptable complete row as Remaining Coils.
 """
 from __future__ import annotations
 
@@ -46,7 +46,12 @@ def _relative_difference(a: float, b: float) -> float:
 
 
 def _compatibility(candidate: pd.Series, anchor: pd.Series) -> float:
-    """Lower is better. Weight dominates, then diameter and width."""
+    """Soft similarity score; lower is better.
+
+    Weight is the main operational grouping criterion. Diameter and width refine
+    the grouping when those values are available. The score is deliberately
+    soft: small differences are accepted ("nu este farmacie").
+    """
     return (
         0.55 * _relative_difference(candidate["Weight_t"], anchor["Weight_t"])
         + 0.30 * _relative_difference(candidate["Diameter_m"], anchor["Diameter_m"])
@@ -54,13 +59,76 @@ def _compatibility(candidate: pd.Series, anchor: pd.Series) -> float:
     )
 
 
-def _role_order(selected: pd.DataFrame, positions: Iterable[tuple]) -> pd.DataFrame:
-    """Assign selected coils to B/W/U positions according to temporary role.
+def _best_selection_for_rank(
+    available: pd.DataFrame, focus_rank: int, capacity: int
+) -> list | None:
+    """Return the most homogeneous complete row for a focus weight group.
 
-    Bottom receives the strongest/largest coils. Wedge receives a compatible
-    coil, preferably with a shorter width. Upper receives the lighter/smaller
-    compatible coils.
+    Every candidate anchor in the focus group is evaluated. Selection is
+    restricted to the same or immediately adjacent group. Same-group cargo is
+    strongly preferred, while the adjacent group may complete the row.
     """
+    anchors = available[available["Size_Group_Rank"] == focus_rank]
+    if anchors.empty:
+        return None
+
+    eligible = available[
+        (available["Size_Group_Rank"] - focus_rank).abs() <= 1
+    ]
+    if len(eligible) < capacity:
+        return None
+
+    best_key = None
+    best_indices = None
+
+    # Test all possible anchors so the engine finds the densest compatible
+    # cluster instead of automatically anchoring on the single heaviest coil.
+    for anchor_idx, anchor in anchors.iterrows():
+        scored = eligible.copy()
+        scored["_compatibility"] = scored.apply(
+            lambda row: _compatibility(row, anchor), axis=1
+        )
+        scored["_rank_distance"] = (
+            scored["Size_Group_Rank"] - focus_rank
+        ).abs()
+        scored["_anchor"] = (scored.index == anchor_idx).astype(int)
+
+        scored = scored.sort_values(
+            ["_anchor", "_rank_distance", "_compatibility", "Weight_t"],
+            ascending=[False, True, True, False],
+        )
+        chosen = scored.head(capacity)
+        if anchor_idx not in chosen.index:
+            continue
+
+        adjacent_count = int((chosen["_rank_distance"] == 1).sum())
+        similarity_total = float(chosen["_compatibility"].sum())
+        weight_span = float(chosen["Weight_t"].max() - chosen["Weight_t"].min())
+        diameter_span = float(chosen["Diameter_m"].max() - chosen["Diameter_m"].min())
+        width_span = float(chosen["Width_m"].max() - chosen["Width_m"].min())
+
+        # Lexicographic objective:
+        # 1) use fewer adjacent-group coils;
+        # 2) maximize overall dimensional similarity;
+        # 3) reduce practical ranges inside the row;
+        # 4) prefer the stronger anchor on an otherwise equal solution.
+        key = (
+            adjacent_count,
+            round(similarity_total, 12),
+            round(weight_span, 12),
+            round(diameter_span, 12),
+            round(width_span, 12),
+            -float(anchor["Weight_t"]),
+        )
+        if best_key is None or key < best_key:
+            best_key = key
+            best_indices = list(chosen.index)
+
+    return best_indices
+
+
+def _role_order(selected: pd.DataFrame, positions: Iterable[tuple]) -> pd.DataFrame:
+    """Assign B/W/U temporary roles after a complete row is selected."""
     selected = selected.copy()
     positions = list(positions)
     bottom_n = sum(1 for p in positions if p[0] == "Bottom")
@@ -72,7 +140,7 @@ def _role_order(selected: pd.DataFrame, positions: Iterable[tuple]) -> pd.DataFr
     bottom = strength.head(bottom_n)
     rest = selected.drop(index=bottom.index)
 
-    # Wedge: compatible with the row but shorter width is preferred.
+    # Wedge may be almost any compatible coil; shorter width is preferred.
     wedge = rest.sort_values(
         ["Width_m", "Weight_t", "Diameter_m"], ascending=[True, False, False]
     ).head(wedge_n)
@@ -118,36 +186,26 @@ def build_complete_rows(cargo: pd.DataFrame, positions: Iterable[tuple]) -> RowB
     rows: list[pd.DataFrame] = []
 
     while len(available) >= capacity:
-        # Largest remaining group, then strongest coil inside that group.
-        top_rank = int(available["Size_Group_Rank"].min())
-        anchor_pool = available[available["Size_Group_Rank"] == top_rank]
-        anchor = anchor_pool.sort_values(
-            ["Weight_t", "Diameter_m", "Width_m"], ascending=False
-        ).iloc[0]
+        selection = None
 
-        # Same group first; adjacent group may complete the row. Extremes are
-        # not mixed unless the cargo list leaves no other complete-row option.
-        candidates = available.copy()
-        candidates["_rank_distance"] = (candidates["Size_Group_Rank"] - top_rank).abs()
-        candidates["_compatibility"] = candidates.apply(lambda r: _compatibility(r, anchor), axis=1)
-        candidates["_is_anchor"] = (candidates.index == anchor.name).astype(int)
-        candidates = candidates.sort_values(
-            ["_is_anchor", "_rank_distance", "_compatibility", "Weight_t"],
-            ascending=[False, True, True, False],
-        )
+        # Always try the largest available group first. Only when it can no
+        # longer produce a complete row do we continue with the next group.
+        for focus_rank in sorted(available["Size_Group_Rank"].unique()):
+            selection = _best_selection_for_rank(available, int(focus_rank), capacity)
+            if selection is not None:
+                break
 
-        preferred = candidates[candidates["_rank_distance"] <= 1]
-        if len(preferred) >= capacity:
-            chosen = preferred.head(capacity)
-        else:
-            # Pragmatic fallback: complete the row with the closest remaining
-            # cargo rather than abandoning a possible complete row.
-            chosen = candidates.head(capacity)
+        if selection is None:
+            # No complete row can be formed without mixing non-adjacent groups.
+            break
 
-        selected = available.loc[chosen.index]
+        selected = available.loc[selection]
         ordered = _role_order(selected, positions)
+        dominant = ordered["Size_Group"].mode().iloc[0]
+        ordered["Row_Group"] = dominant
+        ordered["Mixed_Adjacent_Group"] = ordered["Size_Group"].nunique() > 1
         rows.append(ordered)
-        available = available.drop(index=chosen.index)
+        available = available.drop(index=selection)
 
     remaining = available.sort_values(
         ["Size_Group_Rank", "Weight_t", "Diameter_m", "Width_m"],
