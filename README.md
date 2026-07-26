@@ -43,3 +43,11 @@ See `docs/MILESTONE_3_PROGRESSIVE_CARGO_PLANNING_v9_3.md`.
 
 ## v10.0.0.4 – Zone-specific Upper Row Control
 Each cargo zone now has independent Upper Port and Upper Starboard values for local redistribution of remaining coils.
+
+
+## v10.0.0.5 – Zone-Centric Upper Control
+
+- Ship-wide Upper Port / Upper Starboard selectors removed from the visible interface.
+- Upper values are controlled per Cargo Zone.
+- Local changes automatically recalculate the selected zone preview and refresh Stowage Workspace / Cross View.
+- Preview does not consume Remaining Cargo until validation.
