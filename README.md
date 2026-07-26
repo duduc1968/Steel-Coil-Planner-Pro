@@ -39,3 +39,7 @@ Cargo zones are now persistent operational objects with cargo type, notes, lifec
 ## v9.3 Progressive Cargo Planning
 
 See `docs/MILESTONE_3_PROGRESSIVE_CARGO_PLANNING_v9_3.md`.
+
+
+## v10.0.0.4 – Zone-specific Upper Row Control
+Each cargo zone now has independent Upper Port and Upper Starboard values for local redistribution of remaining coils.
