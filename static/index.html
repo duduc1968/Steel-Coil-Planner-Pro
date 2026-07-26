@@ -154,8 +154,8 @@ if(restoredSession){
   cargoFileName=restoredSession.cargoFileName||'';
 }
 let sessionSaveTimer=null;
-function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.1.0.0',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
-function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.1.0.0',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
+function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.1.0.1',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
+function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.1.0.1',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
 function saveSessionNow(){try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()));localStorage.removeItem(LEGACY_SESSION_KEY)}catch(e){console.warn('Session metadata save failed',e)}writeVoyageSnapshot(voyageSnapshot())}
 function saveSession(){clearTimeout(sessionSaveTimer);sessionSaveTimer=setTimeout(saveSessionNow,120)}
 function renderCargoPreview(restored=false){
@@ -587,7 +587,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.1.0.0 · Previous session restored':'v10.1.0.0 · One Source of Truth';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.1.0.1 · Previous session restored':'v10.1.0.1 · Zone-Level Upper Control';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -602,7 +602,7 @@ function autoSelectZoneForHold(holdIndex=activeHold){
 }
 function zoneId(){return 'Z'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function zonePatternCapacity(h,zone){
-  const p=patternForHold(h); if(!p.valid)return {status:'impossible',reason:(p.errors||[]).join(' '),maxWeight:0,blocks:0,coils:0,allocated:0,difference:-zone.weight};
+  const p=patternForZone(h,zone); if(!p.valid)return {status:'impossible',reason:(p.errors||[]).join(' '),maxWeight:0,blocks:0,coils:0,allocated:0,difference:-zone.weight};
   const usable=Math.max(0,zone.end-zone.start); const blocks=Math.floor((usable+1e-9)/blockLen());
   const coils=blocks*p.coilsPerBlock; const maxWeight=coils*avgT(); const target=Math.max(0,n(zone.weight,0)); const tol=Math.max(0,n(zone.tolerance,0));
   const requestedCoils=Math.round(target/Math.max(.001,avgT())); const selectedCoils=Math.min(coils,requestedCoils); const allocated=selectedCoils*avgT(); const difference=allocated-target;
@@ -877,9 +877,9 @@ function holdCard(r){
  const occPct=r.h.length?100*dim.occupied/r.h.length:0,freePct=100-occPct;
  const stats=hasZones?`<div class="hold-stats"><span class="hold-stat">Occupied ${dim.occupied.toFixed(2)} m · ${occPct.toFixed(1)}%</span><span class="hold-stat free">Free ${dim.free.toFixed(2)} m · ${freePct.toFixed(1)}%</span></div>`:'';
  const zoneStrip=hasZones?`<div class="stowage-zone-strip-wrap"><div class="stowage-zone-strip-title"><span>AFT · Cargo zones</span><span>FORE →</span></div>${stowageZoneMap(r.h)}${stowageDimensionRuler(r.h)}</div>`:'';
- const planContent=displayPattern.valid?`${metricGrid(r.h,false)}<div class="hold-axis"></div><div class="rows">${makeRows(displayPattern,loadedBlocks,maxB,r.h.name,r.h)}</div>`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the selected zone pattern is physically possible.</span></div>`;
+ const planContent=displayPattern.valid?`${metricGrid(r.h,false)}<div class="hold-axis"></div><div class="rows">${hasZones?makeZoneRows(r.h,r.h.name):makeRows(displayPattern,loadedBlocks,maxB,r.h.name,r.h)}</div>`:`<div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">Geometry is not rendered until the selected zone pattern is physically possible.</span></div>`;
  const control=hasZones?`<div class="range-wrap"><span>AFT 0 m</span><output style="flex:1;text-align:center;color:#166534">Zone-controlled stowage · selected zone geometry</output><span>FORE ${n(r.h.length).toFixed(2)} m</span></div>`:`<div class="range-wrap"><span>0 m</span><input id="range_${r.idx}" type="range" min="0" max="${maxB}" step="1" value="${r.blocks}" ${displayPattern.valid?'':'disabled'}><span>${n(r.h.length).toFixed(2)} m</span><output>${r.length.toFixed(2)} m</output></div>`;
- return `<div class="hold-card ${r.idx===activeHold?'active':''} ${displayPattern.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div><div class="hold-summary">${r.length.toFixed(2)} m · ${displayBlocks} blocks · ${displayCoils} coils · ${displayWeight.toFixed(1)} t</div>${stats}</div></div><div class="hold-body"><div class="stowage-plan-stack">${zoneStrip}<div class="hold-boundary-wrap stowage-longitudinal-boundary"><span class="side-label aft">AFT</span><span class="side-label fore">FORE</span><div class="${planClass}">${planContent}</div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(displayPattern)}</div></div></div>`;
+ return `<div class="hold-card ${r.idx===activeHold?'active':''} ${displayPattern.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div><div class="hold-summary">${r.length.toFixed(2)} m · ${displayBlocks} blocks · ${displayCoils} coils · ${displayWeight.toFixed(1)} t</div>${stats}</div></div><div class="hold-body"><div class="stowage-plan-stack">${zoneStrip}<div class="hold-boundary-wrap stowage-longitudinal-boundary"><span class="side-label aft">AFT</span><span class="side-label fore">FORE</span><div class="${planClass}">${planContent}</div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(displayPattern,hasZones?((displayZonesForHold(r.h).find(z=>z.id===selectedZoneId)||displayZonesForHold(r.h)[0]||{}).name||'Selected zone'):'')}</div></div></div>`;
 }
 function getManifestItem(holdName,block,positionId){return stowageManifest().find(x=>x.hold===holdName&&x.block===block&&x.positionId===positionId)}
 function makeLaneRow(cls,label,blocks,maxB,holdName,h){
@@ -910,7 +910,21 @@ function makeRows(p,blocks,maxB,holdName,h){
   const ordered=[...g.coils].sort((a,b)=>a.x-b.x || ({bottom:0,upper:1,wedge:2}[a.type]-{bottom:0,upper:1,wedge:2}[b.type]));
   return ordered.map(c=>makeLaneRow(c.type,c.id,blocks,maxB,holdName,h)).join('');
 }
-function sectionSvg(p){
+function makeZoneRows(h,holdName){
+  const zones=displayZonesForHold(h);
+  const laneMap=new Map();
+  for(const z of zones){
+    const pattern=(z.result&&z.result.pattern)||patternForZone(h,z);
+    if(!pattern.valid)continue;
+    for(const c of geometryEngine(pattern).coils){
+      if(!laneMap.has(c.id))laneMap.set(c.id,{...c});
+    }
+  }
+  const order={bottom:0,wedge:1,upper:2};
+  const lanes=[...laneMap.values()].sort((a,b)=>order[a.type]-order[b.type] || a.x-b.x || String(a.id).localeCompare(String(b.id)));
+  return lanes.map(c=>makeLaneRow(c.type,c.id,0,0,holdName,h)).join('');
+}
+function sectionSvg(p,zoneLabelText=''){
   // Renderer Cleanup v8.14: Cross Section consumes the same Geometry Engine model as Top View.
   if(!p.valid) return `<div class="invalidBox"><div>INVALID PATTERN<br><span style="font-size:12px;font-weight:700">${(p.errors||[]).join(' ')}</span></div></div>`;
   const g=geometryEngine(p);
@@ -927,7 +941,7 @@ function sectionSvg(p){
   function sy(y,d){return base - y*scale}
   const leftWall=sx(cargoMinX), rightWall=sx(cargoMaxX);
   let svg=`<svg class="cross-hold-svg" viewBox="0 0 ${W} ${H+28}">
-  <text x="${W/2}" y="16" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section · Bottom ${p.port}+${p.stbd} · Upper ${p.upPReq}+${p.upSReq} manual · Wedge ${p.wedge} ${wedgeMode==='auto'?'auto':'manual'}</text>
+  <text x="${W/2}" y="16" text-anchor="middle" fill="#334155" font-size="12" font-weight="800">Cross Section${zoneLabelText?' · '+escapeHtml(zoneLabelText):''} · Bottom ${p.port}+${p.stbd} · Upper ${p.upPReq}+${p.upSReq} manual · Wedge ${p.wedge} ${wedgeMode==='auto'?'auto':'manual'}</text>
   <text x="13" y="${base/2}" text-anchor="middle" transform="rotate(-90 13 ${base/2})" fill="#334155" font-size="10" font-weight="900">PORT</text>
   <text x="${W-13}" y="${base/2}" text-anchor="middle" transform="rotate(90 ${W-13} ${base/2})" fill="#334155" font-size="10" font-weight="900">STARBOARD</text>
   <path d="M ${leftWall} 34 L ${leftWall} ${base+p.D*scale/2} Q ${leftWall} ${base+p.D*scale/2+10} ${leftWall+10} ${base+p.D*scale/2+10} L ${rightWall-10} ${base+p.D*scale/2+10} Q ${rightWall} ${base+p.D*scale/2+10} ${rightWall} ${base+p.D*scale/2} L ${rightWall} 34" fill="#f8fafc" stroke="#334155" stroke-width="5"/>
