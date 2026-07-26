@@ -40,5 +40,5 @@ def test_start_new_voyage_and_session_restore_remain_wired():
 
 
 def test_visible_and_persisted_version_is_v10_0_0_1():
-    assert "v10.0.0.5" in SOURCE
-    assert "version:'10.0.0.5'" in SOURCE
+    assert "v10.1.0.0" in SOURCE
+    assert "version:'10.1.0.0'" in SOURCE

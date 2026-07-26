@@ -22,4 +22,4 @@ def test_stowage_uses_zone_specific_geometry():
 
 
 def test_version_bumped():
-    assert "version:'10.0.0.5'" in HTML
+    assert "version:'10.1.0.0'" in HTML
