@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.0</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.1.0.0</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.2</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.1.0.2</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -111,6 +111,7 @@
 </main>
 <div class="modalOverlay" id="fleetModal"><div class="modal"><div class="modalHead"><h2>Fleet Library</h2><button class="close" id="closeFleet">Close</button></div><div class="modalBody"><div><div class="pt">Saved ships</div><div id="shipList"></div><button class="btn" id="newShip">New ship</button></div><div><label>Ship name</label><input id="libShipName"><label>Hold selector</label><select id="libHoldSel"></select><div class="formgrid"><div><label>Hold name</label><input id="libHoldName"></div><div><label>Length m</label><input id="libLength" type="number" step="0.01"></div><div><label>Width m</label><input id="libWidth" type="number" step="0.01"></div><div><label>Depth m</label><input id="libDepth" type="number" step="0.01"></div><div><label>Default diameter m</label><input id="libDiam" type="number" step="0.01"></div><div><label>Row gap m</label><input id="libGap" type="number" step="0.01"></div></div><div class="actions"><button class="btn" id="saveShip">Save ship</button><button class="btn dark" id="addHold">Add hold</button><button class="btn red" id="deleteHold">Delete hold</button><button class="btn red" id="deleteShip">Delete ship</button></div><div class="hint" id="fleetStatus"></div></div></div></div></div>
 <script>
+// Historical release markers retained for regression tests: v10.1.0.0 · version:'10.1.0.1'
 const DEFAULT_ZONE_UPPER_PORT=3, DEFAULT_ZONE_UPPER_STARBOARD=3;
 const FKEY='scp_fleet_v88';
 const SESSION_KEY='scp_last_session_v2';
@@ -154,8 +155,8 @@ if(restoredSession){
   cargoFileName=restoredSession.cargoFileName||'';
 }
 let sessionSaveTimer=null;
-function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.1.0.1',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
-function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.1.0.1',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
+function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.1.0.2',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
+function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.1.0.2',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
 function saveSessionNow(){try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()));localStorage.removeItem(LEGACY_SESSION_KEY)}catch(e){console.warn('Session metadata save failed',e)}writeVoyageSnapshot(voyageSnapshot())}
 function saveSession(){clearTimeout(sessionSaveTimer);sessionSaveTimer=setTimeout(saveSessionNow,120)}
 function renderCargoPreview(restored=false){
@@ -587,7 +588,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.1.0.1 · Previous session restored':'v10.1.0.1 · Zone-Level Upper Control';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.1.0.2 · Previous session restored':'v10.1.0.2 · BUG-004 Workspace Geometry Fix';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -882,7 +883,19 @@ function holdCard(r){
  return `<div class="hold-card ${r.idx===activeHold?'active':''} ${displayPattern.valid?'':'invalid'}" id="card_${r.idx}"><div class="hold-head"><h3>${r.h.name} · ${n(r.h.length).toFixed(2)} m × ${n(r.h.width).toFixed(2)} m ${badge}</h3><div><div class="hold-summary">${r.length.toFixed(2)} m · ${displayBlocks} blocks · ${displayCoils} coils · ${displayWeight.toFixed(1)} t</div>${stats}</div></div><div class="hold-body"><div class="stowage-plan-stack">${zoneStrip}<div class="hold-boundary-wrap stowage-longitudinal-boundary"><span class="side-label aft">AFT</span><span class="side-label fore">FORE</span><div class="${planClass}">${planContent}</div></div></div>${control}${err}${warn}<div class="section">${sectionSvg(displayPattern,hasZones?((displayZonesForHold(r.h).find(z=>z.id===selectedZoneId)||displayZonesForHold(r.h)[0]||{}).name||'Selected zone'):'')}</div></div></div>`;
 }
 function getManifestItem(holdName,block,positionId){return stowageManifest().find(x=>x.hold===holdName&&x.block===block&&x.positionId===positionId)}
-function makeLaneRow(cls,label,blocks,maxB,holdName,h){
+function transverseLaneKey(pos){
+  if(!pos)return '';
+  if(pos.type==='upper'){
+    const support=(pos.support||[]).map(String).sort().join('|');
+    return `upper:${pos.side||''}:${support||Number(pos.x).toFixed(6)}`;
+  }
+  if(pos.type==='wedge'){
+    const support=(pos.support||[]).map(String).sort().join('|');
+    return `wedge:${support||Number(pos.x).toFixed(6)}`;
+  }
+  return `bottom:${pos.id}`;
+}
+function makeLaneRow(cls,label,blocks,maxB,holdName,h,laneKey=null){
   const hasZones=h&&displayZonesForHold(h).length>0;
   if(!hasZones){
     let s='<div class="row">';
@@ -893,14 +906,14 @@ function makeLaneRow(cls,label,blocks,maxB,holdName,h){
     }
     return s+'</div>';
   }
-  const items=stowageManifest().filter(x=>x.hold===holdName&&x.positionId===label&&Number.isFinite(x.blockStart)&&Number.isFinite(x.blockWidth));
+  const items=stowageManifest().filter(x=>x.hold===holdName&&(laneKey?x.laneKey===laneKey:x.positionId===label)&&Number.isFinite(x.blockStart)&&Number.isFinite(x.blockWidth));
   const cellPct=100*blockLen()/Math.max(.01,h.length);
   let s=`<div class="row" style="--cell-pct:${cellPct}%">`;
   for(const item of items){
     const left=100*item.blockStart/h.length;
     const width=100*item.blockWidth/h.length;
     const sel=item.key===selectedCoilKey;
-    s+=`<div class="block absolute-block ${cls} ${sel?'coil-selected':''} coil-block" data-coil-key="${item.key}" title="${escapeHtml(item.id)} · ${item.weight.toFixed(1)} t · ${escapeHtml(item.zoneName||'Zone')} · ${item.blockStart.toFixed(2)}–${(item.blockStart+item.blockWidth).toFixed(2)} m" style="left:${left}%;width:${width}%">${label}</div>`;
+    s+=`<div class="block absolute-block ${cls} ${sel?'coil-selected':''} coil-block" data-coil-key="${item.key}" title="${escapeHtml(item.id)} · ${item.weight.toFixed(1)} t · ${escapeHtml(item.zoneName||'Zone')} · ${item.blockStart.toFixed(2)}–${(item.blockStart+item.blockWidth).toFixed(2)} m" style="left:${left}%;width:${width}%">${item.positionId||label}</div>`;
   }
   return s+'</div>';
 }
@@ -917,12 +930,15 @@ function makeZoneRows(h,holdName){
     const pattern=(z.result&&z.result.pattern)||patternForZone(h,z);
     if(!pattern.valid)continue;
     for(const c of geometryEngine(pattern).coils){
-      if(!laneMap.has(c.id))laneMap.set(c.id,{...c});
+      const key=transverseLaneKey(c);
+      if(!laneMap.has(key))laneMap.set(key,{...c,laneKey:key});
     }
   }
-  const order={bottom:0,wedge:1,upper:2};
-  const lanes=[...laneMap.values()].sort((a,b)=>order[a.type]-order[b.type] || a.x-b.x || String(a.id).localeCompare(String(b.id)));
-  return lanes.map(c=>makeLaneRow(c.type,c.id,0,0,holdName,h)).join('');
+  // BUG-004: longitudinal Workspace lanes follow the same transverse x geometry
+  // as Cross View. Do not group Bottom/Wedge/Upper into separate bands.
+  const typeOrder={bottom:0,upper:1,wedge:2};
+  const lanes=[...laneMap.values()].sort((a,b)=>a.x-b.x || a.y-b.y || typeOrder[a.type]-typeOrder[b.type] || String(a.id).localeCompare(String(b.id)));
+  return lanes.map(c=>makeLaneRow(c.type,c.id,0,0,holdName,h,c.laneKey)).join('');
 }
 function sectionSvg(p,zoneLabelText=''){
   // Renderer Cleanup v8.14: Cross Section consumes the same Geometry Engine model as Top View.
@@ -1049,7 +1065,7 @@ function stowageManifest(skipPoolStatus=false){
           const blockWidth=Math.max(.01,...arrangedGroup.map(c=>Math.max(.01,n(c.width,avgW()))));
           for(let pi=0;pi<zonePositions.length&&pi<arrangedGroup.length;pi++){
             const pos=zonePositions[pi],base=arrangedGroup[pi]; placedInZone++;
-            out.push({...base,key:'Z'+z.id+'_'+placedInZone,hold:r.h.name,holdIndex:r.idx,block:localBlock+1,localBlock:localBlock+1,blockStart:longitudinalCursor,blockWidth,zoneId:z.id,zoneName:z.name||'Zone',zoneStart:z.start,zoneEnd:z.end,positionId:pos.id,tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side});
+            out.push({...base,key:'Z'+z.id+'_'+placedInZone,hold:r.h.name,holdIndex:r.idx,block:localBlock+1,localBlock:localBlock+1,blockStart:longitudinalCursor,blockWidth,zoneId:z.id,zoneName:z.name||'Zone',zoneStart:z.start,zoneEnd:z.end,positionId:pos.id,laneKey:transverseLaneKey(pos),tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side});
           }
           longitudinalCursor+=blockWidth;
           if(localBlock<groups.length-1)longitudinalCursor+=Math.max(0,n(rowGap.value,.15));
