@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.5</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.5</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.6</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.6</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -120,6 +120,7 @@ const VOYAGE_DB='scp_voyage_db_v1';
 const CARGO_ZONES_STATE_KEY='scp_cargo_zones_state_v9417';
 const VOYAGE_STORE='voyages';
 const ACTIVE_VOYAGE_ID='last-active-voyage';
+const OPTIMIZER_VERSION='10.2.0.6';
 let restoredSession=null;
 function loadSession(){try{return JSON.parse(localStorage.getItem(SESSION_KEY))||JSON.parse(localStorage.getItem(LEGACY_SESSION_KEY))||null}catch(e){return null}}
 function openVoyageDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(VOYAGE_DB,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(VOYAGE_STORE))db.createObjectStore(VOYAGE_STORE,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
@@ -297,6 +298,18 @@ function packedCargoRowsLength(coils,rowSizes){
  }
  return length+Math.max(0,rowSizes.length-1)*Math.max(0,n(rowGap.value,.15));
 }
+function orderCoilsForRowPacking(coils,rowSizes){
+ // A block consumes the maximum longitudinal width of its coils. Grouping
+ // similar widths together minimizes the sum of block maxima. Wide-to-wide
+ // packing is therefore shorter than spreading wide coils across every row.
+ const ordered=[...coils].sort((a,b)=>b.width-a.width||b.diameter-a.diameter||b.weight-a.weight||String(a.id).localeCompare(String(b.id)));
+ const packed=[];let cursor=0;
+ for(const size of rowSizes){
+   packed.push(...ordered.slice(cursor,cursor+size));
+   cursor+=size;
+ }
+ return packed;
+}
 function completeRowsOnly(coils,coilsPerBlock){
  const cp=Math.max(1,i(coilsPerBlock,1));
  const completeCount=Math.floor(coils.length/cp)*cp;
@@ -343,7 +356,7 @@ function selectCompleteRowsForTarget(coils,pattern,target,availableLength){
      }
      if(choice){chosen[choice.si]=choice.candidate;sum=choice.newSum;improved=true}
    }
-   chosen=chosen.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+   chosen=orderCoilsForRowPacking(chosen,rowSizes);
    const length=packedCargoRowsLength(chosen,rowSizes);
    if(length>availableLength+1e-9)continue;
    const remaining=coils.length-count;
@@ -359,7 +372,7 @@ function fitCargoCompleteRows(coils,pattern,availableLength){
  for(let count=coils.length;count>=minimum;count--){
    const rowSizes=rowSizesForCount(count,minimum,cp);
    if(!rowSizes.length)continue;
-   const selected=coils.slice(0,count);
+   const selected=orderCoilsForRowPacking(coils.slice(0,count),rowSizes);
    if(packedCargoRowsLength(selected,rowSizes)<=availableLength+1e-9)return {coils:selected,rowSizes};
  }
  return {coils:[],rowSizes:[]};
@@ -395,7 +408,7 @@ function optimizeCargoZone(h,z){
  normalizeZone(z);z.previewCoilIds=[];
  const assigned=allReservedAssignments();const candidates=cargoRows().filter(c=>!assigned.has(String(c.id)));const p=patternForZone(h,z);const target=Math.max(0,n(z.weight,0));const tol=Math.max(0,n(z.tolerance,10));const mode=z.planningMode||'fixed_length';
  const selectedZoneLength=Math.max(0,z.end-z.start);const availableEnd=availableEndForZone(h,z);const availableFromStart=Math.max(0,availableEnd-z.start);const usable=mode==='required_weight'?availableFromStart:selectedZoneLength;
- if(!p.valid||!candidates.length||usable<=0||(mode==='required_weight'&&target<=0)){z.result={status:'impossible',allocated:0,difference:-target,selectedCoils:0,allocatedBlocks:0,allocatedLength:0,requiredLength:0,reason:target<=0&&mode==='required_weight'?'Enter required cargo weight.':'No remaining cargo or no geometric capacity.'};z.optimization={score:0,explain:['No feasible cargo selection from remaining cargo']};touchZone(z);saveCargoZones();return;}
+ if(!p.valid||!candidates.length||usable<=0||(mode==='required_weight'&&target<=0)){z.result={optimizerVersion:OPTIMIZER_VERSION,status:'impossible',allocated:0,difference:-target,selectedCoils:0,allocatedBlocks:0,allocatedLength:0,requiredLength:0,reason:target<=0&&mode==='required_weight'?'Enter required cargo weight.':'No remaining cargo or no geometric capacity.'};z.optimization={score:0,explain:['No feasible cargo selection from remaining cargo']};touchZone(z);saveCargoZones();return;}
  let selected=[],rowSizes=[],sum=0;
  if(mode==='fixed_length'){
    // Fixed length explicitly maximizes coil count. Narrower coils are tested
@@ -416,7 +429,7 @@ function optimizeCargoZone(h,z){
  const weightScore=mode==='fixed_length'?100:(target?Math.max(0,100-Math.abs(diff)/target*100):0);const lengthUse=usable?Math.min(100,requiredLength/usable*100):0;const score=Math.max(0,Math.min(100,.7*weightScore+.2*lengthUse+(fit?10:0)));
  if(mode==='fixed_length')z.weight=sum;
  z.previewCoilIds=selected.map(c=>String(c.id));
- z.result={status,planningMode:mode,reason:mode==='fixed_length'?(selected.length?'Maximum remaining cargo fitted into complete Bottom + Wedge rows.':'No complete Bottom + Wedge row fits the selected length.'):(fit?(within?'Required cargo selected within tolerance; cargo-zone length updated automatically.':'Closest complete-row cargo combination; zone length updated automatically, but weight is outside tolerance.'):'Required cargo needs more free hold length than is available from this position.'),maxWeight:sum,blocks,coils:selected.length,selectedCoils:selected.length,allocatedBlocks:blocks,rowSizes,allocatedLength:requiredLength,allocated:sum,difference:diff,requiredLength,freeLength:Math.max(0,actualZoneLength-requiredLength),availableFromStart,pattern:p};
+ z.result={optimizerVersion:OPTIMIZER_VERSION,status,planningMode:mode,reason:mode==='fixed_length'?(selected.length?'Maximum remaining cargo fitted into complete Bottom + Wedge rows.':'No complete Bottom + Wedge row fits the selected length.'):(fit?(within?'Required cargo selected within tolerance; cargo-zone length updated automatically.':'Closest complete-row cargo combination; zone length updated automatically, but weight is outside tolerance.'):'Required cargo needs more free hold length than is available from this position.'),maxWeight:sum,blocks,coils:selected.length,selectedCoils:selected.length,allocatedBlocks:blocks,rowSizes,allocatedLength:requiredLength,allocated:sum,difference:diff,requiredLength,freeLength:Math.max(0,actualZoneLength-requiredLength),availableFromStart,pattern:p};
  z.optimization={score,weightScore,lengthUse,geometryOk:fit,examined:candidates.length,explain:[mode==='fixed_length'?'Maximum coil count in physically complete rows':'Closest weight using physically complete rows','Complete row = Bottom + Wedge; Upper coils optional','Actual coil widths used',`Row gap ${n(rowGap.value,.15).toFixed(2)} m included`,`${candidates.length} remaining coils examined`,'Preview only — Validate Zone to consume cargo']};touchZone(z);saveCargoZones();
 }
 
@@ -477,6 +490,33 @@ function reoptimizeZoneAfterGeometryChange(h,z){
  const redistribution={remaining,initialCount:remaining.length,allocated:0,log:[]};
  ship().holds.forEach((_,idx)=>syncHoldZonesToStowage(idx));
  return {wasValidated,oldCount:oldReserved.length,newCount:(z.validated?z.reservedCoilIds:z.previewCoilIds||[]).length,redistribution};
+}
+
+function rebuildStaleZoneOptimizations(){
+ const stale=[];
+ ship().holds.forEach((h,holdIndex)=>zonesForHold(h).slice().sort((a,b)=>a.start-b.start).forEach(z=>{
+   if(z.result&&z.result.optimizerVersion!==OPTIMIZER_VERSION){
+     stale.push({h,holdIndex,z,wasValidated:!!z.validated,wasLocked:!!z.locked,lockedBlockStart:z.lockedBlockStart});
+   }
+ }));
+ if(!stale.length)return 0;
+ // Release every stale reservation first so zones are rebuilt sequentially
+ // from one clean cargo pool instead of inheriting obsolete rowSizes.
+ stale.forEach(({z})=>{
+   z.validated=false;z.validatedAt=null;z.locked=false;
+   z.reservedCoilIds=[];z.previewCoilIds=[];z.result=null;z.optimization=null;
+ });
+ stale.forEach(({h,z,wasValidated,wasLocked,lockedBlockStart})=>{
+   optimizeCargoZone(h,z);
+   if(wasValidated&&z.result&&z.result.status!=='impossible'&&(z.previewCoilIds||[]).length){
+     z.reservedCoilIds=[...z.previewCoilIds];
+     z.validated=true;z.validatedAt=new Date().toISOString();
+     z.manualState='validated';z.locked=wasLocked;z.lockedBlockStart=lockedBlockStart;
+   }
+   touchZone(z);
+ });
+ saveCargoZones(true);
+ return stale.length;
 }
 
 function renderCargoPool(){
@@ -728,7 +768,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.5 · Previous session restored':'v10.2.0.5 · Renderer Position Integrity';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.6 · Previous session restored':'v10.2.0.6 · Versioned Optimizer';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -1351,9 +1391,10 @@ async function bootApplication(){
   const restored=await restoreVoyageFromDatabase();
   const removedAutomaticZones=purgeAutomaticRemainingZones();
   renderSelectors();restoreSessionUI();setCargoMode();setBottomMode();setWedgeMode();initAllocations();
+  const rebuiltStaleZones=rebuildStaleZoneOptimizations();
   if(restored){restoreAllocationsFromZones();renderWorkspace();renderZoneWorkspace();setWorkspaceMode(workspaceMode);}
   else build();
-  if(cargoSource==='list'&&Array.isArray(cargo.rows)&&cargo.rows.length){fileState.textContent=cargoFileName||'Restored cargo list';restoredCargoName.style.display='block';restoredCargoName.textContent='Active cargo list: '+(cargoFileName||'Restored cargo list');renderCargoPreview(true);statusBadge.textContent=removedAutomaticZones?`${removedAutomaticZones} automatic zone(s) removed · manual zones preserved`:(restoredZonesAreUsable()?'Last voyage restored':'Cargo restored · planning state needs review')}
+  if(cargoSource==='list'&&Array.isArray(cargo.rows)&&cargo.rows.length){fileState.textContent=cargoFileName||'Restored cargo list';restoredCargoName.style.display='block';restoredCargoName.textContent='Active cargo list: '+(cargoFileName||'Restored cargo list');renderCargoPreview(true);statusBadge.textContent=rebuiltStaleZones?`${rebuiltStaleZones} saved zone(s) rebuilt with optimizer ${OPTIMIZER_VERSION}`:(removedAutomaticZones?`${removedAutomaticZones} automatic zone(s) removed · manual zones preserved`:(restoredZonesAreUsable()?'Last voyage restored':'Cargo restored · planning state needs review'))}
   saveSessionNow();
 }
 bootApplication();
