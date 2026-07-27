@@ -390,6 +390,50 @@ function operationalRowSizes(availableCount,pattern,maximumRows=Number.MAX_SAFE_
  if(sizes.length<rowLimit&&remaining>=foundation&&remaining<capacity)sizes.push(remaining);
  return sizes;
 }
+function operationalCandidateCounts(availableCount,pattern){
+ const count=Math.max(0,i(availableCount,0));
+ const capacity=Math.max(1,i(pattern&&pattern.coilsPerBlock,1));
+ const foundation=minimumOperationalRowSize(pattern);
+ const counts=[];
+ for(let value=capacity;value<=count;value+=capacity)counts.push(value);
+ const remainder=count-Math.floor(count/capacity)*capacity;
+ if(remainder>=foundation&&remainder<capacity&&!counts.includes(count))counts.push(count);
+ return counts;
+}
+function selectFixedCountClosestWeight(candidates,count,target){
+ const wanted=Math.max(0,Math.min(candidates.length,i(count,0)));
+ if(!wanted)return [];
+ const ideal=target/Math.max(1,wanted);
+ const selected=candidates.slice().sort((a,b)=>Math.abs(a.weight-ideal)-Math.abs(b.weight-ideal)||b.weight-a.weight||String(a.id).localeCompare(String(b.id))).slice(0,wanted);
+ let sum=selected.reduce((total,c)=>total+c.weight,0),improved=true,loops=0;
+ while(improved&&loops++<6){
+  improved=false;
+  const used=new Set(selected.map(c=>String(c.id)));
+  let choice=null,bestError=Math.abs(target-sum);
+  for(let si=0;si<selected.length;si++){
+   for(const candidate of candidates){
+    if(used.has(String(candidate.id)))continue;
+    const newSum=sum-selected[si].weight+candidate.weight;
+    const error=Math.abs(target-newSum);
+    if(error+1e-9<bestError){bestError=error;choice={si,candidate,newSum}}
+   }
+  }
+  if(choice){selected[choice.si]=choice.candidate;sum=choice.newSum;improved=true}
+ }
+ return selected;
+}
+function selectOperationalCargoForTarget(candidates,pattern,target){
+ let best={selected:[],rowSizes:[],error:Infinity};
+ for(const count of operationalCandidateCounts(candidates.length,pattern)){
+  const selected=selectFixedCountClosestWeight(candidates,count,target);
+  const weight=selected.reduce((sum,c)=>sum+c.weight,0);
+  const error=Math.abs(target-weight);
+  if(error<best.error-1e-9||(Math.abs(error-best.error)<=1e-9&&selected.length>best.selected.length)){
+   best={selected,rowSizes:operationalRowSizes(count,pattern),error};
+  }
+ }
+ return best;
+}
 function fitOperationalRowsToLength(candidates,pattern,availableLength,rowGapM,fallbackWidth=1.2){
  const capacity=Math.max(1,i(pattern&&pattern.coilsPerBlock,1));
  const foundation=minimumOperationalRowSize(pattern);
@@ -424,11 +468,8 @@ function evaluateAllocationFeasibility(request){
   const fitted=fitOperationalRowsToLength(request.candidates,p,request.usable,request.rowGapM,request.fallbackWidth);
   selected=fitted.selected;rowSizes=fitted.rowSizes;
  }else{
-  selected=selectCargoForTarget(request.candidates,request.target,request.tolerance);
-  const allowPartial=selected.length===request.candidates.length;
-  rowSizes=operationalRowSizes(selected.length,p);
-  if(!allowPartial&&rowSizes.length&&rowSizes[rowSizes.length-1]<cp)rowSizes.pop();
-  selected=selected.slice(0,rowSizes.reduce((sum,size)=>sum+size,0));
+  const operational=selectOperationalCargoForTarget(request.candidates,p,request.target);
+  selected=operational.selected;rowSizes=operational.rowSizes;
  }
  const sum=selected.reduce((a,c)=>a+c.weight,0);
  const requiredLength=packedCargoLengthForGap(selected,cp,request.rowGapM,request.fallbackWidth);

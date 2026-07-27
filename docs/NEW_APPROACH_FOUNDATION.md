@@ -61,3 +61,12 @@ Foundation 4 completed:
 - Allocation requests use one central available-cargo filter.
 - Validated coil IDs are excluded before the next zone request is built.
 - Preview IDs become reserved IDs only through Validate Zone.
+
+Screenshot 73 regression:
+
+- Required-weight selection no longer stops at the first value inside
+  tolerance.
+- It compares every operationally legal row count and minimizes the actual
+  weight error.
+- With 44 equal 10 t coils and a 9-coil pattern, 44 / 440 t wins over
+  36 / 360 t and is returned as `[9, 9, 9, 9, 8]`.

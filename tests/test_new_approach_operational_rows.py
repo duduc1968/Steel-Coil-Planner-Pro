@@ -90,3 +90,39 @@ def test_row_foundation_is_derived_from_geometry_types():
     assert "pos.type==='bottom'||pos.type==='wedge'" in HTML
     assert "Complete requested Upper pattern while sufficient cargo remains" in HTML
     assert "Partial final row only at cargo exhaustion" in HTML
+
+
+def test_screenshot_73_required_weight_selects_all_44_coils():
+    functions = "\n".join(
+        function_source(name)
+        for name in (
+            "minimumOperationalRowSize",
+            "operationalRowSizes",
+            "operationalCandidateCounts",
+            "selectFixedCountClosestWeight",
+            "selectOperationalCargoForTarget",
+        )
+    )
+    script = f"""
+function i(v,d=0){{const x=parseInt(v);return Number.isFinite(x)?x:d}}
+{functions}
+const pattern={{
+ coilsPerBlock:9,
+ coils:[
+  ...Array.from({{length:6}},()=>({{type:'bottom'}})),
+  {{type:'wedge'}},{{type:'upper'}},{{type:'upper'}}
+ ]
+}};
+const cargo=Array.from({{length:44}},(_,k)=>({{
+ id:String(k+1),weight:10,width:1,diameter:1.8
+}}));
+const result=selectOperationalCargoForTarget(cargo,pattern,440);
+process.stdout.write(JSON.stringify({{
+ count:result.selected.length,rowSizes:result.rowSizes,error:result.error
+}}));
+"""
+    result = subprocess.run(
+        ["node", "-e", script], check=True, capture_output=True, text=True
+    )
+    data = json.loads(result.stdout)
+    assert data == {"count": 44, "rowSizes": [9, 9, 9, 9, 8], "error": 0}
