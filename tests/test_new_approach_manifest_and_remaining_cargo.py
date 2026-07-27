@@ -70,3 +70,48 @@ def test_only_validation_copies_preview_ids_to_reserved_ids():
     validate = function_source("validateZone")
     assert "z.reservedCoilIds=[...z.previewCoilIds]" in validate
     assert "z.validationSnapshot=validatedZoneSnapshot(z)" in validate
+
+
+def test_partial_row_keeps_empty_upper_slot_without_losing_bottom_coil():
+    function = function_source("arrangeBlockCoils")
+    script = f"""
+function selectHomogeneousBottom(pool,count){{return pool.slice(0,count)}}
+function selectCompatibleWedge(pool,bottom,count){{return pool.slice(0,count)}}
+function coilMetric(c,key,fallback){{return c[key]??fallback}}
+function avgT(){{return 10}}
+function dia(){{return 1.8}}
+function avgW(){{return 1}}
+{function}
+const positions=[
+ {{id:'B1',type:'bottom'}},{{id:'B2',type:'bottom'}},
+ {{id:'U1',type:'upper'}},{{id:'B3',type:'bottom'}},
+ {{id:'W1',type:'wedge'}},{{id:'B4',type:'bottom'}},
+ {{id:'U2',type:'upper'}},{{id:'B5',type:'bottom'}},
+ {{id:'B6',type:'bottom'}}
+];
+const source=Array.from({{length:8}},(_,k)=>({{
+ id:'C'+(k+1),weight:10,width:1,diameter:1.8
+}}));
+const arranged=arrangeBlockCoils(source,positions);
+process.stdout.write(JSON.stringify(positions.map((p,k)=>[p.id,arranged[k]?.id||null])));
+"""
+    result = subprocess.run(
+        ["node", "-e", script], check=True, capture_output=True, text=True
+    )
+    assert json.loads(result.stdout) == [
+        ["B1", "C1"],
+        ["B2", "C2"],
+        ["U1", "C8"],
+        ["B3", "C3"],
+        ["W1", "C7"],
+        ["B4", "C4"],
+        ["U2", None],
+        ["B5", "C5"],
+        ["B6", "C6"],
+    ]
+
+
+def test_manifest_skips_null_position_instead_of_collapsing_geometry():
+    manifest = function_source("stowageManifest")
+    assert "const placedGroup=arrangedGroup.filter(Boolean)" in manifest
+    assert "if(!base)continue;placedInZone++" in manifest

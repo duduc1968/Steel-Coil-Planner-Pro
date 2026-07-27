@@ -70,3 +70,11 @@ Screenshot 73 regression:
   weight error.
 - With 44 equal 10 t coils and a 9-coil pattern, 44 / 440 t wins over
   36 / 360 t and is returned as `[9, 9, 9, 9, 8]`.
+
+Screenshot 74 regression:
+
+- Partial-row position assignment preserves null geometry slots.
+- With Bottom 3+3, Wedge 1, and only one of two Upper coils available, the
+  empty position remains an Upper position.
+- Bottom B1 through B6 and Wedge W1 remain present and cannot shift into the
+  empty Upper slot.

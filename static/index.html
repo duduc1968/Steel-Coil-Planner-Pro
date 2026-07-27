@@ -1222,7 +1222,10 @@ function arrangeBlockCoils(source,positions){
   upper.forEach(c=>used.add(c));
   const leftovers=pool.filter(c=>!used.has(c));
   const queues={bottom:[...bottom],wedge:[...wedge],upper:[...upper]};
-  return positions.map(pos=>(queues[pos.type]&&queues[pos.type].length?queues[pos.type].shift():leftovers.shift())).filter(Boolean);
+  // Preserve one entry per geometry position. A missing Upper in a partial
+  // final row must remain a null slot; collapsing it would shift subsequent
+  // Bottom coils into the wrong transverse positions.
+  return positions.map(pos=>(queues[pos.type]&&queues[pos.type].length?queues[pos.type].shift():(leftovers.length?leftovers.shift():null)));
 }
 function partitionCoilsByRowSizes(coils,rowSizes,fallbackCapacity){
  const source=[...coils],groups=[];let cursor=0;
@@ -1266,9 +1269,10 @@ function stowageManifest(skipPoolStatus=false){
         for(let localBlock=0;localBlock<groups.length;localBlock++){
           const group=groups[localBlock];
           const arrangedGroup=arrangeBlockCoils(group,zonePositions);
-          const blockWidth=Math.max(.01,...arrangedGroup.map(c=>Math.max(.01,n(c.width,avgW()))));
+          const placedGroup=arrangedGroup.filter(Boolean);
+          const blockWidth=Math.max(.01,...placedGroup.map(c=>Math.max(.01,n(c.width,avgW()))));
           for(let pi=0;pi<zonePositions.length&&pi<arrangedGroup.length;pi++){
-            const pos=zonePositions[pi],base=arrangedGroup[pi]; placedInZone++;
+            const pos=zonePositions[pi],base=arrangedGroup[pi];if(!base)continue;placedInZone++;
             out.push({...base,key:'Z'+z.id+'_'+placedInZone,hold:r.h.name,holdIndex:r.idx,block:localBlock+1,localBlock:localBlock+1,blockStart:longitudinalCursor,blockWidth,zoneId:z.id,zoneName:z.name||'Zone',zoneStart:z.start,zoneEnd:z.end,positionId:pos.id,laneKey:transverseLaneKey(pos),tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side,geometryDiameter:n(pos.diameter,zonePattern.D||dia())});
           }
           longitudinalCursor+=blockWidth;
@@ -1285,7 +1289,7 @@ function stowageManifest(skipPoolStatus=false){
       const blockSource=src.slice(cursor,cursor+take);
       const arrangedBlock=arrangeBlockCoils(blockSource,positions);
       for(let pi=0;pi<positions.length&&pi<arrangedBlock.length;pi++){
-        const pos=positions[pi],base=arrangedBlock[pi]; cursor++;
+        const pos=positions[pi],base=arrangedBlock[pi];if(!base)continue;cursor++;
         out.push({...base,key:'K'+cursor,hold:r.h.name,holdIndex:r.idx,block:b,positionId:pos.id,tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side});
       }
     }
