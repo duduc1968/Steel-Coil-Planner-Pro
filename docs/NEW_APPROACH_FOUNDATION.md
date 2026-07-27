@@ -78,3 +78,11 @@ Screenshot 74 regression:
   empty position remains an Upper position.
 - Bottom B1 through B6 and Wedge W1 remain present and cannot shift into the
   empty Upper slot.
+
+Foundation 4.3:
+
+- Zone-controlled hold headers and Voyage Summary use the same physical
+  occupied length as the longitudinal dimension ruler.
+- Row gaps are counted only between rows, never after the final row.
+- Clicking a validated zone segment in Stowage Workspace keeps the current
+  workspace open and changes only the selected zone / Cross View geometry.
