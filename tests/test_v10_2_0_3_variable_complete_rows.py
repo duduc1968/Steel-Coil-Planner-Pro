@@ -26,6 +26,8 @@ def test_renderer_uses_real_per_row_sizes():
     assert "for(const size of storedRowSizes)" in text
 
 
-def test_validation_redistributes_remaining_complete_rows():
+def test_validation_does_not_create_automatic_zones():
     text = source()
-    assert "const redistribution=autoPlaceRemainingCargo(hi,z.id)" in text
+    validation_line = next(line for line in text.splitlines() if "[data-validate-zone]" in line)
+    assert "autoPlaceRemainingCargo" not in validation_line
+    assert "remaining cargo stays available for manual zoning" in validation_line

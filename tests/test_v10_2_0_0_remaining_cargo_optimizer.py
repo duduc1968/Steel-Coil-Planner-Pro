@@ -6,24 +6,22 @@ def source():
     return HTML.read_text(encoding="utf-8")
 
 def test_version():
-    assert any(v in source() for v in ("v10.2.0.0", "v10.2.0.1", "v10.2.0.2", "v10.2.0.3"))
+    assert any(v in source() for v in ("v10.2.0.0", "v10.2.0.1", "v10.2.0.2", "v10.2.0.3", "v10.2.0.4"))
 
-def test_global_redistribution_is_called_after_zone_rebuild():
+def test_zone_rebuild_keeps_remaining_cargo_unassigned():
     text = source()
-    assert "autoPlaceRemainingCargo(hi,z.id)" in text
+    assert "const redistribution={remaining,initialCount:remaining.length,allocated:0,log:[]}" in text
     assert "ship().holds.forEach((_,idx)=>syncHoldZonesToStowage(idx))" in text
 
-def test_automatic_zones_are_real_validated_reservations():
+def test_automatic_zone_creator_is_removed():
     text = source()
-    assert "autoRemaining:true,validated:true" in text
-    assert "reservedCoilIds:selected.map" in text
+    assert "function autoPlaceRemainingCargo(" not in text
+    assert "autoRemaining:true,validated:true" not in text
 
-def test_source_hold_is_searched_first():
+def test_manual_zone_cleanup_preserves_user_zones():
     text = source()
-    assert "const order=[sourceHoldIndex]" in text
+    assert "const manual=current.filter(z=>!z.autoRemaining)" in text
 
-def test_zone_geometry_drives_redistribution_pattern():
+def test_zone_geometry_still_drives_selected_zone():
     text = source()
-    assert "patternForZone(h,draft)" in text
-    assert "upperPort:sourceZone" in text
-    assert "upperStbd:sourceZone" in text
+    assert "patternForZone(h,z)" in text
