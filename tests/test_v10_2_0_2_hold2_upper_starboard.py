@@ -7,10 +7,10 @@ def source():
     return HTML.read_text(encoding="utf-8")
 
 
-def test_validated_zone_upper_controls_remain_editable():
+def test_upper_controls_are_editable_until_validation_then_locked():
     text = source()
-    assert 'id="zoneUpperPort_${idx}" type="number" step="1" min="0" value="${Math.max(0,i(selected.upperPort,0))}">' in text
-    assert 'id="zoneUpperStbd_${idx}" type="number" step="1" min="0" value="${Math.max(0,i(selected.upperStbd,0))}">' in text
+    assert 'id="zoneUpperPort_${idx}" type="number" step="1" min="0" value="${Math.max(0,i(selected.upperPort,0))}" ${selected.validated?\'disabled\':\'\'}>' in text
+    assert 'id="zoneUpperStbd_${idx}" type="number" step="1" min="0" value="${Math.max(0,i(selected.upperStbd,0))}" ${selected.validated?\'disabled\':\'\'}>' in text
 
 
 def test_zone_inputs_use_the_selected_zones_hold_index():
