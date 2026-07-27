@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.2</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.2</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.3</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.3</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -264,6 +264,39 @@ function packedCargoLength(coils,coilsPerBlock){
  for(let k=0;k<coils.length;k+=cp){const group=coils.slice(k,k+cp);length+=Math.max(...group.map(c=>Math.max(.01,n(c.width,avgW()))));blocks++;}
  return length+Math.max(0,blocks-1)*Math.max(0,n(rowGap.value,.15));
 }
+function minimumCompleteRowSize(pattern){
+ return Math.max(1,(pattern.coils||[]).filter(c=>c.type==='bottom'||c.type==='wedge').length);
+}
+function rowSizesForCount(count,minimumSize,maximumSize){
+ const total=Math.max(0,i(count,0)),minRow=Math.max(1,i(minimumSize,1)),maxRow=Math.max(minRow,i(maximumSize,minRow));
+ if(!total)return [];
+ // Use the fewest rows that can carry the coils, but accept a row only when
+ // every row contains the complete Bottom + Wedge foundation.
+ for(let rows=Math.ceil(total/maxRow);rows<=Math.floor(total/minRow);rows++){
+   if(total<rows*minRow||total>rows*maxRow)continue;
+   const sizes=Array(rows).fill(minRow);
+   let extra=total-rows*minRow;
+   // Fill earlier rows with Upper coils first; the final row may legally be
+   // Bottom + Wedge only.
+   for(let r=0;r<rows&&extra>0;r++){
+     const add=Math.min(maxRow-minRow,extra);
+     sizes[r]+=add;extra-=add;
+   }
+   return sizes;
+ }
+ return [];
+}
+function packedCargoRowsLength(coils,rowSizes){
+ if(!coils.length||!rowSizes.length)return 0;
+ let cursor=0,length=0;
+ for(const size of rowSizes){
+   const row=coils.slice(cursor,cursor+size);
+   if(row.length<size)return Infinity;
+   length+=Math.max(...row.map(c=>Math.max(.01,n(c.width,avgW()))));
+   cursor+=size;
+ }
+ return length+Math.max(0,rowSizes.length-1)*Math.max(0,n(rowGap.value,.15));
+}
 function completeRowsOnly(coils,coilsPerBlock){
  const cp=Math.max(1,i(coilsPerBlock,1));
  const completeCount=Math.floor(coils.length/cp)*cp;
@@ -280,15 +313,18 @@ function fitCargoToLength(coils,coilsPerBlock,availableLength){
  }
  return out;
 }
-function selectCompleteRowsForTarget(coils,coilsPerBlock,target,availableLength){
- const cp=Math.max(1,i(coilsPerBlock,1));
- const maxComplete=Math.floor(coils.length/cp)*cp;
- if(!maxComplete||availableLength<=0)return [];
+function selectCompleteRowsForTarget(coils,pattern,target,availableLength){
+ const cp=Math.max(1,i(pattern.coilsPerBlock,1));
+ const minimum=minimumCompleteRowSize(pattern);
+ if(coils.length<minimum||availableLength<=0)return {coils:[],rowSizes:[]};
  let best=[],bestKey=null;
- // Evaluate cargo counts only in complete-row multiples. For every count,
- // build a deterministic near-target set and refine it by single-coil swaps.
- // This prevents a valid one-row solution from being truncated to zero.
- for(let count=cp;count<=maxComplete;count+=cp){
+ let bestRowSizes=[];
+ // A complete row requires Bottom + Wedge. Upper positions are optional on
+ // the final rows, so evaluate every coil count that can be partitioned into
+ // one or more physically complete rows.
+ for(let count=minimum;count<=coils.length;count++){
+   const rowSizes=rowSizesForCount(count,minimum,cp);
+   if(!rowSizes.length)continue;
    const ideal=target/Math.max(1,count);
    let chosen=coils.slice().sort((a,b)=>Math.abs(a.weight-ideal)-Math.abs(b.weight-ideal)||b.weight-a.weight||String(a.id).localeCompare(String(b.id))).slice(0,count);
    let sum=chosen.reduce((a,c)=>a+c.weight,0);
@@ -308,12 +344,25 @@ function selectCompleteRowsForTarget(coils,coilsPerBlock,target,availableLength)
      if(choice){chosen[choice.si]=choice.candidate;sum=choice.newSum;improved=true}
    }
    chosen=chosen.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
-   const length=packedCargoLength(chosen,cp);
+   const length=packedCargoRowsLength(chosen,rowSizes);
    if(length>availableLength+1e-9)continue;
-   const key=[Math.abs(target-sum),length,-count];
-   if(bestKey===null||key[0]<bestKey[0]-1e-9||(Math.abs(key[0]-bestKey[0])<=1e-9&&(key[1]<bestKey[1]-1e-9||(Math.abs(key[1]-bestKey[1])<=1e-9&&key[2]<bestKey[2])))){best=chosen;bestKey=key}
+   const remaining=coils.length-count;
+   const key=[Math.abs(target-sum),remaining,length,-count];
+   if(bestKey===null||key[0]<bestKey[0]-1e-9||(Math.abs(key[0]-bestKey[0])<=1e-9&&(key[1]<bestKey[1]||(key[1]===bestKey[1]&&(key[2]<bestKey[2]-1e-9||(Math.abs(key[2]-bestKey[2])<=1e-9&&key[3]<bestKey[3])))))){best=chosen;bestRowSizes=rowSizes;bestKey=key}
  }
- return best;
+ return {coils:best,rowSizes:bestRowSizes};
+}
+function fitCargoCompleteRows(coils,pattern,availableLength){
+ const cp=Math.max(1,i(pattern.coilsPerBlock,1)),minimum=minimumCompleteRowSize(pattern);
+ // Maximize loaded coils. This explicitly compares a fuller penultimate row
+ // against creating another Bottom + Wedge row.
+ for(let count=coils.length;count>=minimum;count--){
+   const rowSizes=rowSizesForCount(count,minimum,cp);
+   if(!rowSizes.length)continue;
+   const selected=coils.slice(0,count);
+   if(packedCargoRowsLength(selected,rowSizes)<=availableLength+1e-9)return {coils:selected,rowSizes};
+ }
+ return {coils:[],rowSizes:[]};
 }
 function freeIntervals(h){
  const zs=zonesForHold(h).slice().sort((a,b)=>a.start-b.start);const out=[];let cursor=0;
@@ -350,10 +399,10 @@ function autoPlaceRemainingCargo(sourceHoldIndex,sourceZoneId){
      const p=patternForZone(h,draft);
      if(!p.valid)continue;
      const available=interval[1]-interval[0];
-     const selected=fitCargoToLength(remaining,p.coilsPerBlock,available);
+     const fitted=fitCargoCompleteRows(remaining,p,available),selected=fitted.coils;
      if(!selected.length)continue;
-     const used=packedCargoLength(selected,p.coilsPerBlock),wt=selected.reduce((a,c)=>a+c.weight,0),blocks=selected.length/Math.max(1,p.coilsPerBlock);
-     const z={...draft,end:interval[0]+used,weight:wt,tolerance:0,cargoType:'Steel coils',notes:'Automatically redistributed from Remaining Cargo after a zone geometry change.',manualState:'validated',locked:false,autoRemaining:true,validated:true,validatedAt:now,createdAt:now,updatedAt:now,previewCoilIds:[],reservedCoilIds:selected.map(c=>String(c.id)),result:{status:'possible',planningMode:'fixed_length',reason:'Remaining coils redistributed into complete rows in free hold space.',maxWeight:wt,blocks,coils:selected.length,selectedCoils:selected.length,allocatedBlocks:blocks,allocatedLength:used,allocated:wt,difference:0,requiredLength:used,freeLength:Math.max(0,available-used),pattern:p},optimization:{score:100,weightScore:100,lengthUse:available?Math.min(100,used/available*100):0,geometryOk:true,examined:remaining.length,explain:['Global remaining-cargo redistribution','Complete rows only','Actual coil widths used','Requested row gap included']}};
+     const used=packedCargoRowsLength(selected,fitted.rowSizes),wt=selected.reduce((a,c)=>a+c.weight,0),blocks=fitted.rowSizes.length;
+     const z={...draft,end:interval[0]+used,weight:wt,tolerance:0,cargoType:'Steel coils',notes:'Automatically redistributed from Remaining Cargo after a zone geometry change.',manualState:'validated',locked:false,autoRemaining:true,validated:true,validatedAt:now,createdAt:now,updatedAt:now,previewCoilIds:[],reservedCoilIds:selected.map(c=>String(c.id)),result:{status:'possible',planningMode:'fixed_length',reason:'Remaining coils redistributed into complete Bottom + Wedge rows; Upper coils used where available.',maxWeight:wt,blocks,coils:selected.length,selectedCoils:selected.length,allocatedBlocks:blocks,rowSizes:fitted.rowSizes,allocatedLength:used,allocated:wt,difference:0,requiredLength:used,freeLength:Math.max(0,available-used),pattern:p},optimization:{score:100,weightScore:100,lengthUse:available?Math.min(100,used/available*100):0,geometryOk:true,examined:remaining.length,explain:['Global remaining-cargo redistribution','Complete row = Bottom + Wedge; Upper optional','Actual coil widths used','Requested row gap included']}};
      zonesForHold(h).push(z);
      remaining=remaining.slice(selected.length);
      log.push(`${selected.length} coils → ${h.name} / ${zoneLabel(h,z)}`);
@@ -372,19 +421,15 @@ function optimizeCargoZone(h,z){
  const assigned=allReservedAssignments();const candidates=cargoRows().filter(c=>!assigned.has(String(c.id)));const p=patternForZone(h,z);const target=Math.max(0,n(z.weight,0));const tol=Math.max(0,n(z.tolerance,10));const mode=z.planningMode||'fixed_length';
  const selectedZoneLength=Math.max(0,z.end-z.start);const availableEnd=availableEndForZone(h,z);const availableFromStart=Math.max(0,availableEnd-z.start);const usable=mode==='required_weight'?availableFromStart:selectedZoneLength;
  if(!p.valid||!candidates.length||usable<=0||(mode==='required_weight'&&target<=0)){z.result={status:'impossible',allocated:0,difference:-target,selectedCoils:0,allocatedBlocks:0,allocatedLength:0,requiredLength:0,reason:target<=0&&mode==='required_weight'?'Enter required cargo weight.':'No remaining cargo or no geometric capacity.'};z.optimization={score:0,explain:['No feasible cargo selection from remaining cargo']};touchZone(z);saveCargoZones();return;}
- let selected=[],sum=0;
+ let selected=[],rowSizes=[],sum=0;
  if(mode==='fixed_length'){
    const ordered=candidates.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
-   selected=fitCargoToLength(ordered,p.coilsPerBlock,usable);sum=selected.reduce((a,c)=>a+c.weight,0);
+   const fitted=fitCargoCompleteRows(ordered,p,usable);selected=fitted.coils;rowSizes=fitted.rowSizes;sum=selected.reduce((a,c)=>a+c.weight,0);
  }else{
-   selected=selectCompleteRowsForTarget(candidates,p.coilsPerBlock,target,usable);
+   const fitted=selectCompleteRowsForTarget(candidates,p,target,usable);selected=fitted.coils;rowSizes=fitted.rowSizes;
    sum=selected.reduce((a,c)=>a+c.weight,0);
  }
- // Automatic planning may commit only complete rows. Any tentative partial
- // row is rolled back and remains available in Remaining Cargo.
- selected=completeRowsOnly(selected,p.coilsPerBlock);
- sum=selected.reduce((a,c)=>a+c.weight,0);
- const requiredLength=packedCargoLength(selected,p.coilsPerBlock),blocks=selected.length/Math.max(1,p.coilsPerBlock),diff=sum-target,within=mode==='fixed_length'||Math.abs(diff)<=tol,fit=requiredLength<=usable+1e-9;
+ const requiredLength=packedCargoRowsLength(selected,rowSizes),blocks=rowSizes.length,diff=sum-target,within=mode==='fixed_length'||Math.abs(diff)<=tol,fit=requiredLength<=usable+1e-9;
  if(mode==='required_weight'){
    // Required-weight mode calculates and draws the zone length automatically.
    // It may grow only into free longitudinal space and never overlap another zone.
@@ -394,8 +439,8 @@ function optimizeCargoZone(h,z){
  const weightScore=mode==='fixed_length'?100:(target?Math.max(0,100-Math.abs(diff)/target*100):0);const lengthUse=usable?Math.min(100,requiredLength/usable*100):0;const score=Math.max(0,Math.min(100,.7*weightScore+.2*lengthUse+(fit?10:0)));
  if(mode==='fixed_length')z.weight=sum;
  z.previewCoilIds=selected.map(c=>String(c.id));
- z.result={status,planningMode:mode,reason:mode==='fixed_length'?(selected.length?'Maximum remaining cargo fitted into the selected length.':'No remaining coils fit the selected length.'):(fit?(within?'Required cargo selected within tolerance; cargo-zone length updated automatically.':'Closest remaining cargo combination; cargo-zone length updated automatically, but weight is outside tolerance.'):'Required cargo needs more free hold length than is available from this position.'),maxWeight:sum,blocks,coils:selected.length,selectedCoils:selected.length,allocatedBlocks:blocks,allocatedLength:requiredLength,allocated:sum,difference:diff,requiredLength,freeLength:Math.max(0,actualZoneLength-requiredLength),availableFromStart,pattern:p};
- z.optimization={score,weightScore,lengthUse,geometryOk:fit,examined:candidates.length,explain:[mode==='fixed_length'?'Maximum coil count from remaining cargo':'Closest weight from remaining cargo and automatic zone resizing','Actual coil widths used',`Row gap ${n(rowGap.value,.15).toFixed(2)} m included`,`${candidates.length} remaining coils examined`,'Preview only — Validate Zone to consume cargo']};touchZone(z);saveCargoZones();
+ z.result={status,planningMode:mode,reason:mode==='fixed_length'?(selected.length?'Maximum remaining cargo fitted into complete Bottom + Wedge rows.':'No complete Bottom + Wedge row fits the selected length.'):(fit?(within?'Required cargo selected within tolerance; cargo-zone length updated automatically.':'Closest complete-row cargo combination; zone length updated automatically, but weight is outside tolerance.'):'Required cargo needs more free hold length than is available from this position.'),maxWeight:sum,blocks,coils:selected.length,selectedCoils:selected.length,allocatedBlocks:blocks,rowSizes,allocatedLength:requiredLength,allocated:sum,difference:diff,requiredLength,freeLength:Math.max(0,actualZoneLength-requiredLength),availableFromStart,pattern:p};
+ z.optimization={score,weightScore,lengthUse,geometryOk:fit,examined:candidates.length,explain:[mode==='fixed_length'?'Maximum coil count in physically complete rows':'Closest weight using physically complete rows','Complete row = Bottom + Wedge; Upper coils optional','Actual coil widths used',`Row gap ${n(rowGap.value,.15).toFixed(2)} m included`,`${candidates.length} remaining coils examined`,'Preview only — Validate Zone to consume cargo']};touchZone(z);saveCargoZones();
 }
 
 
@@ -705,7 +750,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.2 · Previous session restored':'v10.2.0.2 · Hold 2 Upper Starboard Fix';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.3 · Previous session restored':'v10.2.0.3 · Variable Complete Rows';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -952,7 +997,7 @@ function bindZoneEvents(){
    }
  });
 
- document.querySelectorAll('[data-optimize]').forEach(btn=>btn.onclick=()=>{const z=findZone(btn.dataset.optimize),hi=findZoneHold(z.id),h=hold(hi);syncZoneInputs(h,z,hi);optimizeCargoZone(h,z);statusBadge.textContent='Zone optimized in preview · validate to consume remaining cargo';renderZoneWorkspace()});document.querySelectorAll('[data-validate-zone]').forEach(btn=>btn.onclick=()=>{const z=findZone(btn.dataset.validateZone),hi=findZoneHold(z.id);if(validateZone(z)){ship().holds.forEach((_,idx)=>syncHoldZonesToStowage(idx));statusBadge.textContent='Zone validated · remaining cargo recalculated'}else alert('Optimize a feasible zone before validation.');renderZoneWorkspace()});document.querySelectorAll('[data-unlock-zone]').forEach(btn=>btn.onclick=()=>{const z=findZone(btn.dataset.unlockZone),hi=findZoneHold(z.id);unlockZone(z);syncHoldZonesToStowage(hi);statusBadge.textContent='Zone unlocked · only this zone returned to Remaining Cargo';renderZoneWorkspace()});
+ document.querySelectorAll('[data-optimize]').forEach(btn=>btn.onclick=()=>{const z=findZone(btn.dataset.optimize),hi=findZoneHold(z.id),h=hold(hi);syncZoneInputs(h,z,hi);optimizeCargoZone(h,z);statusBadge.textContent='Zone optimized in preview · validate to consume remaining cargo';renderZoneWorkspace()});document.querySelectorAll('[data-validate-zone]').forEach(btn=>btn.onclick=()=>{const z=findZone(btn.dataset.validateZone),hi=findZoneHold(z.id);if(validateZone(z)){const redistribution=autoPlaceRemainingCargo(hi,z.id);ship().holds.forEach((_,idx)=>syncHoldZonesToStowage(idx));statusBadge.textContent=redistribution.allocated?`Zone validated · ${redistribution.allocated} remaining coils placed in complete rows`:'Zone validated · remaining cargo recalculated'}else alert('Optimize a feasible zone before validation.');renderZoneWorkspace()});document.querySelectorAll('[data-unlock-zone]').forEach(btn=>btn.onclick=()=>{const z=findZone(btn.dataset.unlockZone),hi=findZoneHold(z.id);unlockZone(z);syncHoldZonesToStowage(hi);statusBadge.textContent='Zone unlocked · only this zone returned to Remaining Cargo';renderZoneWorkspace()});
  document.querySelectorAll('[data-delete-zone]').forEach(btn=>btn.onclick=()=>{const hi=findZoneHold(btn.dataset.deleteZone);cargoZones[hold(hi).name]=zonesForHold(hold(hi)).filter(z=>z.id!==btn.dataset.deleteZone);selectedZoneId=null;syncHoldZonesToStowage(hi);saveCargoZones();renderZoneWorkspace()});
  document.querySelectorAll('[data-clear-hold]').forEach(btn=>btn.onclick=()=>{const hi=Number(btn.dataset.clearHold);cargoZones[hold(hi).name]=[];selectedZoneId=null;syncHoldZonesToStowage(hi);saveCargoZones();renderZoneWorkspace()});
  ['zoneName_','zoneWeight_','zoneTol_','zoneUpperPort_','zoneUpperStbd_','zoneCargo_','zoneMode_','zoneState_','zoneNotes_','zoneLocked_'].forEach(prefix=>{const el=document.getElementById(prefix+activeHold);if(el){const localUpper=prefix==='zoneUpperPort_'||prefix==='zoneUpperStbd_';const evt=(el.tagName==='SELECT'||el.type==='checkbox'||localUpper)?'change':'input';el.addEventListener(evt,()=>{const z=findZone(selectedZoneId);if(!z)return;const hi=findZoneHold(z.id);if(hi<0)return;activeHold=hi;const h=hold(hi);syncZoneInputs(h,z,hi);if(localUpper){const change=reoptimizeZoneAfterGeometryChange(h,z);const delta=change.newCount-change.oldCount;const moved=change.redistribution?.allocated||0;const left=change.redistribution?.remaining?.length??remainingCargoInfo(hi).count;statusBadge.textContent=moved>0?`Zone rebuilt · ${moved} remaining coils redistributed · ${left} still remaining`:delta>0?`Zone rebuilt · ${delta} remaining coils allocated`:delta<0?`Zone rebuilt · ${Math.abs(delta)} coils returned · no complete row fits free space`:`Zone rebuilt · ${left} coils remaining`;renderZoneWorkspace();renderWorkspace(false);return}if(prefix!=='zoneState_'&&prefix!=='zoneNotes_'&&prefix!=='zoneLocked_')z.result=null;touchZone(z);saveCargoZones();if(prefix==='zoneLocked_'||prefix==='zoneState_')renderZoneWorkspace();})}});
@@ -1189,8 +1234,18 @@ function stowageManifest(skipPoolStatus=false){
         const zoneSource=displayIds.length?displayIds.map(id=>src.find(c=>String(c.id)===id)).filter(Boolean):src.slice(cursor,cursor+Math.max(0,i(z.result.selectedCoils,0)));
         const zoneCoilLimit=Math.min(zoneSource.length,Math.max(0,i(z.result.selectedCoils,zoneSource.length)));
         const cp=Math.max(1,zonePositions.length);
+        const storedRowSizes=Array.isArray(z.result.rowSizes)?z.result.rowSizes.map(v=>Math.max(1,i(v,cp))).filter(Boolean):[];
         const groups=[];
-        for(let gidx=0;gidx<zoneCoilLimit;gidx+=cp)groups.push(zoneSource.slice(gidx,Math.min(gidx+cp,zoneCoilLimit)));
+        if(storedRowSizes.length){
+          let sourceCursor=0;
+          for(const size of storedRowSizes){
+            if(sourceCursor>=zoneCoilLimit)break;
+            groups.push(zoneSource.slice(sourceCursor,Math.min(sourceCursor+size,zoneCoilLimit)));
+            sourceCursor+=size;
+          }
+        }else{
+          for(let gidx=0;gidx<zoneCoilLimit;gidx+=cp)groups.push(zoneSource.slice(gidx,Math.min(gidx+cp,zoneCoilLimit)));
+        }
         let placedInZone=0, longitudinalCursor=z.start;
         for(let localBlock=0;localBlock<groups.length;localBlock++){
           const group=groups[localBlock];

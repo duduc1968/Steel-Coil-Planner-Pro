@@ -6,7 +6,7 @@ def source():
     return HTML.read_text(encoding="utf-8")
 
 def test_version():
-    assert any(v in source() for v in ("v10.2.0.0", "v10.2.0.1", "v10.2.0.2"))
+    assert any(v in source() for v in ("v10.2.0.0", "v10.2.0.1", "v10.2.0.2", "v10.2.0.3"))
 
 def test_global_redistribution_is_called_after_zone_rebuild():
     text = source()
