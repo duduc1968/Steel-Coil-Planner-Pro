@@ -21,7 +21,9 @@ def test_unlock_mutates_only_the_selected_zone():
 
 def test_locked_zone_block_number_is_persisted_before_local_unlock():
     assert "function ensureLockedBlockStarts()" in SOURCE
-    assert "ensureLockedBlockStarts();z.validated=false" in SOURCE
+    unlock = SOURCE.split("function unlockZone(", 1)[1].split("function cargoPoolRows(", 1)[0]
+    assert unlock.index("ensureLockedBlockStarts()") < unlock.index("z.validated=false")
+    assert "delete z.validationSnapshot" in unlock
     assert "z.lockedBlockStart=nextLockedBlockStart(z)" in SOURCE
     assert "lockedBlockStart" in SOURCE[SOURCE.index("function voyageSnapshot"):]
 

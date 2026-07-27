@@ -22,6 +22,6 @@ def test_both_optimizers_use_width_homogeneous_packing():
 
 def test_saved_results_are_versioned_but_never_rebuilt_on_startup():
     text = source()
-    assert "const OPTIMIZER_VERSION='10.2.0.6'" in text
+    assert "const OPTIMIZER_VERSION='10.2.0.9'" in text
     assert "function rebuildStaleZoneOptimizations()" not in text
     assert "rebuildStaleZoneOptimizations()" not in text
