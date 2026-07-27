@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.7</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.7</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.8</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.8</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -241,7 +241,20 @@ window.addEventListener('beforeunload',saveSessionNow);
 function readCargoZonesState(){try{const state=JSON.parse(localStorage.getItem(CARGO_ZONES_STATE_KEY));if(state&&state.zones&&typeof state.zones==='object')return state}catch(e){}return null}
 function loadCargoZones(){const state=readCargoZonesState();if(state)return state.zones;try{return JSON.parse(localStorage.getItem('scp_cargo_zones_v821'))||{}}catch(e){return {}}}
 function saveCargoZones(immediate=false){const savedAt=new Date().toISOString();localStorage.setItem('scp_cargo_zones_v821',JSON.stringify(cargoZones));localStorage.setItem(CARGO_ZONES_STATE_KEY,JSON.stringify({savedAt,zones:cargoZones,selectedZoneId,selectedZoneByHold}));if(selectedZoneId)localStorage.setItem('scp_selected_zone_v9',selectedZoneId);else localStorage.removeItem('scp_selected_zone_v9');if(immediate)saveSessionNow();else saveSession()}
-function normalizeZone(z){if(!z)return z;if(!z.createdAt)z.createdAt=new Date().toISOString();if(!z.updatedAt)z.updatedAt=z.createdAt;if(z.cargoType==null)z.cargoType='Steel coils';if(z.notes==null)z.notes='';if(z.locked==null)z.locked=false;if(z.validated)z.locked=true;if(!z.manualState)z.manualState='auto';if(!z.planningMode)z.planningMode='fixed_length';if(z.upperPort==null)z.upperPort=DEFAULT_ZONE_UPPER_PORT;if(z.upperStbd==null)z.upperStbd=DEFAULT_ZONE_UPPER_STARBOARD;if(!Array.isArray(z.previewCoilIds))z.previewCoilIds=[];if(!Array.isArray(z.reservedCoilIds))z.reservedCoilIds=[];if(z.autoRemaining&&!z.validated){z.autoRemaining=false;z.name=z.name==='Remaining Cargo'?'Remaining Cargo Zone':z.name;z.planningMode='required_weight';z.weight=0;z.previewCoilIds=[];z.reservedCoilIds=[];z.result=null;z.optimization=null;z.manualState='draft';z.locked=false;z.notes='Editable remaining-cargo zone. Enter the required weight or switch to Fixed Zone Length.';}return z}
+function validatedZoneSnapshot(z){
+ return {name:z.name,cargoType:z.cargoType,notes:z.notes,start:z.start,end:z.end,weight:z.weight,tolerance:z.tolerance,planningMode:z.planningMode,upperPort:z.upperPort,upperStbd:z.upperStbd,manualState:'validated',locked:true,lockedBlockStart:z.lockedBlockStart,validatedAt:z.validatedAt,reservedCoilIds:[...(z.reservedCoilIds||[])],previewCoilIds:[...(z.previewCoilIds||[])],result:z.result?structuredClone(z.result):null,optimization:z.optimization?structuredClone(z.optimization):null};
+}
+function enforceValidatedZoneSnapshot(z){
+ if(!z||!z.validated)return z;
+ if(!z.validationSnapshot)z.validationSnapshot=validatedZoneSnapshot(z);
+ const s=z.validationSnapshot;
+ for(const key of ['name','cargoType','notes','start','end','weight','tolerance','planningMode','upperPort','upperStbd','manualState','locked','lockedBlockStart','validatedAt','result','optimization'])z[key]=(s[key]&&typeof s[key]==='object')?structuredClone(s[key]):s[key];
+ z.reservedCoilIds=[...(s.reservedCoilIds||[])];
+ z.previewCoilIds=[...(s.previewCoilIds||[])];
+ z.validated=true;z.locked=true;z.manualState='validated';
+ return z;
+}
+function normalizeZone(z){if(!z)return z;if(!z.createdAt)z.createdAt=new Date().toISOString();if(!z.updatedAt)z.updatedAt=z.createdAt;if(z.cargoType==null)z.cargoType='Steel coils';if(z.notes==null)z.notes='';if(z.locked==null)z.locked=false;if(!z.manualState)z.manualState='auto';if(!z.planningMode)z.planningMode='fixed_length';if(z.upperPort==null)z.upperPort=DEFAULT_ZONE_UPPER_PORT;if(z.upperStbd==null)z.upperStbd=DEFAULT_ZONE_UPPER_STARBOARD;if(!Array.isArray(z.previewCoilIds))z.previewCoilIds=[];if(!Array.isArray(z.reservedCoilIds))z.reservedCoilIds=[];if(z.validated)enforceValidatedZoneSnapshot(z);if(z.autoRemaining&&!z.validated){z.autoRemaining=false;z.name=z.name==='Remaining Cargo'?'Remaining Cargo Zone':z.name;z.planningMode='required_weight';z.weight=0;z.previewCoilIds=[];z.reservedCoilIds=[];z.result=null;z.optimization=null;z.manualState='draft';z.locked=false;z.notes='Editable remaining-cargo zone. Enter the required weight or switch to Fixed Zone Length.';}return z}
 function zoneLife(z){normalizeZone(z);if(z.validated)return 'validated';if(z.result&&z.result.status!=='impossible')return 'optimized';if(n(z.weight,0)>0)return 'allocated';return 'draft'}
 function zoneLifeText(z){return zoneLife(z).toUpperCase()}
 function touchZone(z){z.updatedAt=new Date().toISOString()}
@@ -252,9 +265,9 @@ function allReservedAssignments(){
  return map;
 }
 function nextLockedBlockStart(z){let next=1;for(const h of ship().holds){for(const x of zonesForHold(h)){if(x.id===z.id||!x.validated||!x.locked)continue;const start=Number(x.lockedBlockStart)||next;next=Math.max(next,start+Math.max(0,i(x.result&&x.result.allocatedBlocks,x.result&&x.result.blocks)));}}return next}
-function validateZone(z){if(!z||!z.result||z.result.status==='impossible'||!(z.previewCoilIds||[]).length)return false;ensureLockedBlockStarts();z.reservedCoilIds=[...z.previewCoilIds];z.validated=true;z.validatedAt=new Date().toISOString();z.manualState='validated';z.locked=true;z.lockedBlockStart=nextLockedBlockStart(z);touchZone(z);saveCargoZones(true);return true}
+function validateZone(z){if(!z||!z.result||z.result.status==='impossible'||!(z.previewCoilIds||[]).length)return false;ensureLockedBlockStarts();z.reservedCoilIds=[...z.previewCoilIds];z.validated=true;z.validatedAt=new Date().toISOString();z.manualState='validated';z.locked=true;z.lockedBlockStart=nextLockedBlockStart(z);z.validationSnapshot=validatedZoneSnapshot(z);touchZone(z);saveCargoZones(true);return true}
 function ensureLockedBlockStarts(){for(const h of ship().holds){let next=1;for(const x of zonesForHold(h).filter(x=>x.validated&&x.result&&x.result.status!=='impossible').slice().sort((a,b)=>a.start-b.start)){if(x.locked&&!Number.isFinite(Number(x.lockedBlockStart)))x.lockedBlockStart=next;next+=Math.max(0,i(x.result.allocatedBlocks,x.result.blocks));}}}
-function unlockZone(z){if(!z||!z.validated)return;ensureLockedBlockStarts();z.validated=false;z.validatedAt=null;z.reservedCoilIds=[];z.previewCoilIds=[];z.result=null;z.optimization=null;z.locked=false;z.lockedBlockStart=null;z.manualState='auto';touchZone(z);saveCargoZones(true)}
+function unlockZone(z){if(!z||!z.validated)return;ensureLockedBlockStarts();delete z.validationSnapshot;z.validated=false;z.validatedAt=null;z.reservedCoilIds=[];z.previewCoilIds=[];z.result=null;z.optimization=null;z.locked=false;z.lockedBlockStart=null;z.manualState='auto';touchZone(z);saveCargoZones(true)}
 function cargoPoolRows(){
  const assignments=allReservedAssignments();
  const loadedIds=new Set(stowageManifest(true).map(x=>String(x.id)));
@@ -495,30 +508,6 @@ function reoptimizeZoneAfterGeometryChange(h,z){
  const redistribution={remaining,initialCount:remaining.length,allocated:0,log:[]};
  ship().holds.forEach((_,idx)=>syncHoldZonesToStowage(idx));
  return {wasValidated,oldCount:oldReserved.length,newCount:(z.validated?z.reservedCoilIds:z.previewCoilIds||[]).length,redistribution};
-}
-
-function rebuildStaleZoneOptimizations(){
- const stale=[];
- ship().holds.forEach((h,holdIndex)=>zonesForHold(h).slice().sort((a,b)=>a.start-b.start).forEach(z=>{
-   // A validated zone is an operational commitment. Never release, migrate,
-   // or recalculate it automatically, even when its optimizer version is old.
-   if(!z.validated&&z.result&&z.result.optimizerVersion!==OPTIMIZER_VERSION){
-     stale.push({h,holdIndex,z});
-   }
- }));
- if(!stale.length)return 0;
- // Release every stale reservation first so zones are rebuilt sequentially
- // from one clean cargo pool instead of inheriting obsolete rowSizes.
- stale.forEach(({z})=>{
-   z.validated=false;z.validatedAt=null;z.locked=false;
-   z.reservedCoilIds=[];z.previewCoilIds=[];z.result=null;z.optimization=null;
- });
- stale.forEach(({h,z})=>{
-   optimizeCargoZone(h,z);
-   touchZone(z);
- });
- saveCargoZones(true);
- return stale.length;
 }
 
 function renderCargoPool(){
@@ -770,7 +759,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.7 · Previous session restored':'v10.2.0.7 · Validated Zone Lock';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.8 · Previous session restored':'v10.2.0.8 · Validated Zone Snapshot Lock';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -1344,7 +1333,7 @@ function renderCoilInspector(){
 }
 
 function renderSummary(){const rows=allocRows(),manifest=stowageManifest();const actualByHold=new Map();manifest.forEach(x=>{if(!actualByHold.has(x.hold))actualByHold.set(x.hold,{coils:0,weight:0,blocks:new Set()});const a=actualByHold.get(x.hold);a.coils++;a.weight+=n(x.weight,0);a.blocks.add(Number(x.holdBlock||x.block)||0)});const displayRows=rows.map(r=>{const a=actualByHold.get(r.h.name);return a?{...r,blocks:a.blocks.size,coils:a.coils,weight:a.weight}:r});const allocatedCoils=displayRows.reduce((s,r)=>s+r.coils,0),allocatedWt=displayRows.reduce((s,r)=>s+r.weight,0),allocatedLen=displayRows.reduce((s,r)=>s+r.length,0);const rem=Math.max(0,cargo.coils-allocatedCoils);summaryBox.innerHTML=`<div class="statgrid"><div class="stat"><b>Total coils</b><span>${cargo.coils}</span></div><div class="stat"><b>Total weight</b><span>${cargo.totalWeight.toFixed(1)} t</span></div><div class="stat"><b>Allocated</b><span>${allocatedWt.toFixed(1)} t</span></div><div class="stat"><b>Length used</b><span>${allocatedLen.toFixed(2)} m</span></div><div class="stat"><b>Remaining coils</b><span class="${rem?'warn':'ok'}">${rem}</span></div><div class="stat"><b>Remaining weight</b><span class="${rem?'warn':'ok'}">${(rem*avgT()).toFixed(1)} t</span></div></div><table><thead><tr><th>Hold</th><th>Length</th><th>Blocks</th><th>Coils</th><th>Weight</th></tr></thead><tbody>${displayRows.slice().reverse().map(r=>`<tr class="${r.idx===activeHold?'activeRow':''}"><td>${r.h.name}</td><td>${r.length.toFixed(2)} m</td><td>${r.blocks}</td><td>${r.coils}</td><td>${r.weight.toFixed(1)} t</td></tr>`).join('')}</tbody></table><div class="hint">Cargo source: ${cargoSource==='list'?'Cargo List':'Simulation'}. Blocks use the same AFT-to-FORE hold numbering as Workspace and Coil Inspector.</div>`}
-async function importCargo(){const f=cargoFile.files[0];if(!f){alert('Choose cargo file first');return}cargoSource='list';setCargoMode();fileState.textContent=f.name;try{const fd=new FormData();fd.append('cargo_file',f);const res=await fetch('/import-cargo',{method:'POST',body:fd});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Import failed');cargoFileName=data.filename||f.name;restoredCargoName.style.display='block';restoredCargoName.textContent='Active cargo list: '+cargoFileName;cargo.coils=data.coil_count;cargo.totalWeight=data.total_weight_t;cargo.avgWeight=data.avg_weight_t||data.total_weight_t/data.coil_count;cargo.avgWidth=data.avg_width_m||1.2;cargo.avgDiameter=data.avg_diameter_m||null;avgWeight.value=cargo.avgWeight.toFixed(2);avgWidth.value=cargo.avgWidth.toFixed(2);if(cargo.avgDiameter){avgDiameter.value=cargo.avgDiameter.toFixed(3);diaHint.textContent='Diameter source: cargo list average '+cargo.avgDiameter.toFixed(3)+' m.'}else diaHint.textContent='No Diameter column found. Enter average diameter manually.';cargo.rows=data.coils||[];for(const h of ship().holds){for(const z of zonesForHold(h)){z.reservedCoilIds=[];z.optimization=null;z.result=null;}}saveCargoZones();renderCargoPreview(false);statusBadge.textContent='Cargo imported';allocations={};saveSessionNow();await writeVoyageSnapshot(voyageSnapshot());build()}catch(e){cargoPreview.innerHTML='<span class="bad">'+e.message+'</span>'}}
+async function importCargo(){const f=cargoFile.files[0];if(!f){alert('Choose cargo file first');return}cargoSource='list';setCargoMode();fileState.textContent=f.name;try{const fd=new FormData();fd.append('cargo_file',f);const res=await fetch('/import-cargo',{method:'POST',body:fd});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Import failed');cargoFileName=data.filename||f.name;restoredCargoName.style.display='block';restoredCargoName.textContent='Active cargo list: '+cargoFileName;cargo.coils=data.coil_count;cargo.totalWeight=data.total_weight_t;cargo.avgWeight=data.avg_weight_t||data.total_weight_t/data.coil_count;cargo.avgWidth=data.avg_width_m||1.2;cargo.avgDiameter=data.avg_diameter_m||null;avgWeight.value=cargo.avgWeight.toFixed(2);avgWidth.value=cargo.avgWidth.toFixed(2);if(cargo.avgDiameter){avgDiameter.value=cargo.avgDiameter.toFixed(3);diaHint.textContent='Diameter source: cargo list average '+cargo.avgDiameter.toFixed(3)+' m.'}else diaHint.textContent='No Diameter column found. Enter average diameter manually.';cargo.rows=data.coils||[];for(const h of ship().holds){for(const z of zonesForHold(h)){if(z.validated){enforceValidatedZoneSnapshot(z);continue}z.reservedCoilIds=[];z.optimization=null;z.result=null;}}saveCargoZones();renderCargoPreview(false);statusBadge.textContent='Cargo imported · validated zones preserved';allocations={};saveSessionNow();await writeVoyageSnapshot(voyageSnapshot());build()}catch(e){cargoPreview.innerHTML='<span class="bad">'+e.message+'</span>'}}
 function setCargoMode(){cargoListMode.classList.toggle('active',cargoSource==='list');simulationMode.classList.toggle('active',cargoSource==='sim');cargoListPanel.style.display=cargoSource==='list'?'block':'none';simulationPanel.style.display=cargoSource==='sim'?'block':'none'}
 function setBottomMode(){bottomAutoBtn.classList.toggle('active',bottomMode==='auto');bottomManualBtn.classList.toggle('active',bottomMode==='manual');bottomManualBox.style.display=bottomMode==='manual'?'grid':'none'}function setWedgeMode(){wedgeAutoBtn.classList.toggle('active',wedgeMode==='auto');wedgeManualBtn.classList.toggle('active',wedgeMode==='manual');wedgeManualBox.style.display=wedgeMode==='manual'?'block':'none'}
 shipSelect.onchange=()=>{activeShip=Number(shipSelect.value);activeHold=0;allocations={};renderSelectors();build()};holdSelect.onchange=()=>{activeHold=Number(holdSelect.value);syncSideFromHold();if(workspaceMode==='zones'){openHoldZoneOptions(activeHold);}else{renderWorkspace();document.getElementById('card_'+activeHold)?.scrollIntoView({behavior:'smooth',block:'center'});}};[holdWidth,holdLength,avgDiameter,rowGap,avgWidth,avgWeight,simCoils,simTonnes,bottomPort,bottomStbd,wedgeCount].forEach(el=>el.addEventListener('input',()=>{const h=hold();h.width=n(holdWidth.value,h.width);h.length=n(holdLength.value,h.length);h.diameter=n(avgDiameter.value,h.diameter);h.rowGap=n(rowGap.value,h.rowGap);saveFleet();build()}));importBtn.onclick=importCargo;buildBtn.onclick=build;newVoyageBtn.onclick=startNewVoyage;cargoListMode.onclick=()=>{cargoSource='list';setCargoMode();build()};simulationMode.onclick=()=>{cargoSource='sim';setCargoMode();build()};bottomAutoBtn.onclick=()=>{bottomMode='auto';setBottomMode();build()};bottomManualBtn.onclick=()=>{bottomMode='manual';setBottomMode();build()};wedgeAutoBtn.onclick=()=>{wedgeMode='auto';setWedgeMode();build()};wedgeManualBtn.onclick=()=>{wedgeMode='manual';setWedgeMode();build()};
@@ -1393,10 +1382,9 @@ async function bootApplication(){
   const restored=await restoreVoyageFromDatabase();
   const removedAutomaticZones=purgeAutomaticRemainingZones();
   renderSelectors();restoreSessionUI();setCargoMode();setBottomMode();setWedgeMode();initAllocations();
-  const rebuiltStaleZones=rebuildStaleZoneOptimizations();
   if(restored){restoreAllocationsFromZones();renderWorkspace();renderZoneWorkspace();setWorkspaceMode(workspaceMode);}
   else build();
-  if(cargoSource==='list'&&Array.isArray(cargo.rows)&&cargo.rows.length){fileState.textContent=cargoFileName||'Restored cargo list';restoredCargoName.style.display='block';restoredCargoName.textContent='Active cargo list: '+(cargoFileName||'Restored cargo list');renderCargoPreview(true);statusBadge.textContent=rebuiltStaleZones?`${rebuiltStaleZones} saved zone(s) rebuilt with optimizer ${OPTIMIZER_VERSION}`:(removedAutomaticZones?`${removedAutomaticZones} automatic zone(s) removed · manual zones preserved`:(restoredZonesAreUsable()?'Last voyage restored':'Cargo restored · planning state needs review'))}
+  if(cargoSource==='list'&&Array.isArray(cargo.rows)&&cargo.rows.length){fileState.textContent=cargoFileName||'Restored cargo list';restoredCargoName.style.display='block';restoredCargoName.textContent='Active cargo list: '+(cargoFileName||'Restored cargo list');renderCargoPreview(true);statusBadge.textContent=removedAutomaticZones?`${removedAutomaticZones} automatic zone(s) removed · manual zones preserved`:(restoredZonesAreUsable()?'Last voyage restored · validated zones preserved exactly':'Cargo restored · planning state needs review')}
   saveSessionNow();
 }
 bootApplication();

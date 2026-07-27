@@ -6,7 +6,7 @@ def source():
     return HTML.read_text(encoding="utf-8")
 
 def test_version():
-    assert any(v in source() for v in ("v10.2.0.0", "v10.2.0.1", "v10.2.0.2", "v10.2.0.3", "v10.2.0.4", "v10.2.0.5", "v10.2.0.6", "v10.2.0.7"))
+    assert any(v in source() for v in ("v10.2.0.0", "v10.2.0.1", "v10.2.0.2", "v10.2.0.3", "v10.2.0.4", "v10.2.0.5", "v10.2.0.6", "v10.2.0.7", "v10.2.0.8"))
 
 def test_zone_rebuild_keeps_remaining_cargo_unassigned():
     text = source()
