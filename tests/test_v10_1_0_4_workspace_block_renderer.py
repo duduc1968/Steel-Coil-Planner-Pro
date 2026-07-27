@@ -16,4 +16,4 @@ def test_zone_workspace_no_longer_uses_geometry_overlap_canvas():
 
 def test_version_is_10_1_0_4():
     text = HTML.read_text(encoding="utf-8")
-    assert "v10.1.0.4" in text
+    assert "v10.1.0.4" in text or "v10.1.0.5" in text
