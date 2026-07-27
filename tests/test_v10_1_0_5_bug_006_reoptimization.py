@@ -4,7 +4,7 @@ HTML = Path(__file__).parents[1] / "static" / "index.html"
 
 
 def test_version_is_10_1_0_5():
-    assert any(v in HTML.read_text(encoding="utf-8") for v in ("v10.1.0.5", "v10.2.0.0"))
+    assert any(v in HTML.read_text(encoding="utf-8") for v in ("v10.1.0.5", "v10.2.0.0", "v10.2.0.1"))
 
 
 def test_geometry_change_releases_own_reservation_before_optimization():

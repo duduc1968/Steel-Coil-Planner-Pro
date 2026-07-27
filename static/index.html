@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.0</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.0</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -280,6 +280,41 @@ function fitCargoToLength(coils,coilsPerBlock,availableLength){
  }
  return out;
 }
+function selectCompleteRowsForTarget(coils,coilsPerBlock,target,availableLength){
+ const cp=Math.max(1,i(coilsPerBlock,1));
+ const maxComplete=Math.floor(coils.length/cp)*cp;
+ if(!maxComplete||availableLength<=0)return [];
+ let best=[],bestKey=null;
+ // Evaluate cargo counts only in complete-row multiples. For every count,
+ // build a deterministic near-target set and refine it by single-coil swaps.
+ // This prevents a valid one-row solution from being truncated to zero.
+ for(let count=cp;count<=maxComplete;count+=cp){
+   const ideal=target/Math.max(1,count);
+   let chosen=coils.slice().sort((a,b)=>Math.abs(a.weight-ideal)-Math.abs(b.weight-ideal)||b.weight-a.weight||String(a.id).localeCompare(String(b.id))).slice(0,count);
+   let sum=chosen.reduce((a,c)=>a+c.weight,0);
+   let loops=0,improved=true;
+   while(improved&&loops++<6){
+     improved=false;
+     const used=new Set(chosen.map(c=>String(c.id)));
+     let choice=null,bestError=Math.abs(target-sum);
+     for(let si=0;si<chosen.length;si++){
+       for(const candidate of coils){
+         if(used.has(String(candidate.id)))continue;
+         const newSum=sum-chosen[si].weight+candidate.weight;
+         const error=Math.abs(target-newSum);
+         if(error+1e-9<bestError){bestError=error;choice={si,candidate,newSum}}
+       }
+     }
+     if(choice){chosen[choice.si]=choice.candidate;sum=choice.newSum;improved=true}
+   }
+   chosen=chosen.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+   const length=packedCargoLength(chosen,cp);
+   if(length>availableLength+1e-9)continue;
+   const key=[Math.abs(target-sum),length,-count];
+   if(bestKey===null||key[0]<bestKey[0]-1e-9||(Math.abs(key[0]-bestKey[0])<=1e-9&&(key[1]<bestKey[1]-1e-9||(Math.abs(key[1]-bestKey[1])<=1e-9&&key[2]<bestKey[2])))){best=chosen;bestKey=key}
+ }
+ return best;
+}
 function freeIntervals(h){
  const zs=zonesForHold(h).slice().sort((a,b)=>a.start-b.start);const out=[];let cursor=0;
  for(const z of zs){if(z.start>cursor+.01)out.push([cursor,z.start]);cursor=Math.max(cursor,z.end);}if(cursor<h.length-.01)out.push([cursor,h.length]);return out;
@@ -342,9 +377,8 @@ function optimizeCargoZone(h,z){
    const ordered=candidates.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
    selected=fitCargoToLength(ordered,p.coilsPerBlock,usable);sum=selected.reduce((a,c)=>a+c.weight,0);
  }else{
-   const sorted=candidates.slice().sort((a,b)=>b.weight-a.weight||String(a.id).localeCompare(String(b.id)));
-   for(const c of sorted){const trial=selected.concat(c);const ns=sum+c.weight;if(ns<=target+tol||sum<target-tol){selected=trial;sum=ns;if(Math.abs(sum-target)<=tol)break;}}
-   let improved=true,loops=0;while(improved&&loops++<5){improved=false;const used=new Set(selected.map(x=>x.id));let best=Math.abs(target-sum),choice=null;for(let si=0;si<selected.length;si++){for(const c of candidates){if(used.has(c.id))continue;const ns=sum-selected[si].weight+c.weight,err=Math.abs(target-ns);if(err+1e-9<best){best=err;choice={si,c,ns}}}}if(choice){selected[choice.si]=choice.c;sum=choice.ns;improved=true}}
+   selected=selectCompleteRowsForTarget(candidates,p.coilsPerBlock,target,usable);
+   sum=selected.reduce((a,c)=>a+c.weight,0);
  }
  // Automatic planning may commit only complete rows. Any tentative partial
  // row is rolled back and remains available in Remaining Cargo.
@@ -671,7 +705,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.0 · Previous session restored':'v10.2.0.0 · Workspace Block Renderer';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.1 · Previous session restored':'v10.2.0.1 · Complete Row Optimizer';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
