@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.4</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.4</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.2.0.5</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">v10.2.0.5</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -398,7 +398,9 @@ function optimizeCargoZone(h,z){
  if(!p.valid||!candidates.length||usable<=0||(mode==='required_weight'&&target<=0)){z.result={status:'impossible',allocated:0,difference:-target,selectedCoils:0,allocatedBlocks:0,allocatedLength:0,requiredLength:0,reason:target<=0&&mode==='required_weight'?'Enter required cargo weight.':'No remaining cargo or no geometric capacity.'};z.optimization={score:0,explain:['No feasible cargo selection from remaining cargo']};touchZone(z);saveCargoZones();return;}
  let selected=[],rowSizes=[],sum=0;
  if(mode==='fixed_length'){
-   const ordered=candidates.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+   // Fixed length explicitly maximizes coil count. Narrower coils are tested
+   // first because each longitudinal row consumes the width of its widest coil.
+   const ordered=candidates.slice().sort((a,b)=>a.width-b.width||a.diameter-b.diameter||b.weight-a.weight||String(a.id).localeCompare(String(b.id)));
    const fitted=fitCargoCompleteRows(ordered,p,usable);selected=fitted.coils;rowSizes=fitted.rowSizes;sum=selected.reduce((a,c)=>a+c.weight,0);
  }else{
    const fitted=selectCompleteRowsForTarget(candidates,p,target,usable);selected=fitted.coils;rowSizes=fitted.rowSizes;
@@ -726,7 +728,7 @@ function recomputeFrom(changedIdx){
   renderWorkspace(false);
 }
 function allocRows(){let remaining=cargo.coils,totalLen=0,totalWt=0;return ship().holds.map((h,idx)=>{const p=patternForHold(h);const blocks=p.valid?blocksForLength(allocations[h.name]||0,h):0;const capacity=p.valid?blocks*p.coilsPerBlock:0;const coils=Math.min(remaining,capacity);remaining-=coils;const weight=coils*avgT();const length=p.valid?lengthForBlocks(blocks):0;totalLen+=length;totalWt+=weight;return{h,idx,p,blocks,coils,weight,length,remainingAfter:remaining,totalLen,totalWt}})}
-function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.4 · Previous session restored':'v10.2.0.4 · Manual Zones Only';saveSession()}
+function build(){if(cargoSource==='sim'){cargo.coils=i(simCoils.value,0);cargo.totalWeight=n(simTonnes.value,0);cargo.avgWeight=cargo.coils?cargo.totalWeight/cargo.coils:n(avgWeight.value,20);avgWeight.value=cargo.avgWeight.toFixed(2);fileState.textContent='Simulation';renderCargoPreview(false)}initAllocations();if(!restoredSession&&Object.values(allocations).every(v=>!v)){const h=hold(0),p=patternForHold(h);allocations[h.name]=p.valid?Math.min(n(h.length,48),Math.ceil(cargo.coils/p.coilsPerBlock)*blockLen()):0}renderWorkspace();renderZoneWorkspace();statusBadge.textContent=restoredSession?'v10.2.0.5 · Previous session restored':'v10.2.0.5 · Renderer Position Integrity';saveSession()}
 
 function zonesForHold(h){if(!cargoZones[h.name])cargoZones[h.name]=[];cargoZones[h.name].forEach(normalizeZone);return cargoZones[h.name]}
 function autoSelectZoneForHold(holdIndex=activeHold){
@@ -1187,9 +1189,10 @@ function arrangeBlockCoils(source,positions){
   wedge.forEach(c=>used.add(c));
   const upper=pool.filter(c=>!used.has(c)).sort((a,b)=>coilMetric(a,'weight',avgT())-coilMetric(b,'weight',avgT()) || coilMetric(a,'diameter',dia())-coilMetric(b,'diameter',dia()) || coilMetric(a,'width',avgW())-coilMetric(b,'width',avgW())).slice(0,byType.upper.length);
   upper.forEach(c=>used.add(c));
-  const leftovers=pool.filter(c=>!used.has(c));
   const queues={bottom:[...bottom],wedge:[...wedge],upper:[...upper]};
-  return positions.map(pos=>(queues[pos.type]&&queues[pos.type].length?queues[pos.type].shift():leftovers.shift())).filter(Boolean);
+  // Preserve one array slot per geometry position. Missing optional Upper
+  // coils must remain null; filtering them would shift B5/B6 into U1/U2.
+  return positions.map(pos=>(queues[pos.type]&&queues[pos.type].length?queues[pos.type].shift():null));
 }
 
 function stowageManifest(skipPoolStatus=false){
@@ -1226,9 +1229,12 @@ function stowageManifest(skipPoolStatus=false){
         for(let localBlock=0;localBlock<groups.length;localBlock++){
           const group=groups[localBlock];
           const arrangedGroup=arrangeBlockCoils(group,zonePositions);
-          const blockWidth=Math.max(.01,...arrangedGroup.map(c=>Math.max(.01,n(c.width,avgW()))));
+          const actualGroup=arrangedGroup.filter(Boolean);
+          const blockWidth=Math.max(.01,...actualGroup.map(c=>Math.max(.01,n(c.width,avgW()))));
           for(let pi=0;pi<zonePositions.length&&pi<arrangedGroup.length;pi++){
-            const pos=zonePositions[pi],base=arrangedGroup[pi]; placedInZone++;
+            const pos=zonePositions[pi],base=arrangedGroup[pi];
+            if(!base)continue;
+            placedInZone++;
             out.push({...base,key:'Z'+z.id+'_'+placedInZone,hold:r.h.name,holdIndex:r.idx,block:localBlock+1,localBlock:localBlock+1,blockStart:longitudinalCursor,blockWidth,zoneId:z.id,zoneName:z.name||'Zone',zoneStart:z.start,zoneEnd:z.end,positionId:pos.id,laneKey:transverseLaneKey(pos),tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side,geometryDiameter:n(pos.diameter,zonePattern.D||dia())});
           }
           longitudinalCursor+=blockWidth;
@@ -1245,7 +1251,9 @@ function stowageManifest(skipPoolStatus=false){
       const blockSource=src.slice(cursor,cursor+take);
       const arrangedBlock=arrangeBlockCoils(blockSource,positions);
       for(let pi=0;pi<positions.length&&pi<arrangedBlock.length;pi++){
-        const pos=positions[pi],base=arrangedBlock[pi]; cursor++;
+        const pos=positions[pi],base=arrangedBlock[pi];
+        if(!base)continue;
+        cursor++;
         out.push({...base,key:'K'+cursor,hold:r.h.name,holdIndex:r.idx,block:b,positionId:pos.id,tier:pos.type,type:pos.type,x:pos.x,y:pos.y,side:pos.side});
       }
     }
