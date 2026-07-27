@@ -16,4 +16,4 @@ def test_zone_workspace_no_longer_uses_geometry_overlap_canvas():
 
 def test_version_is_10_1_0_4():
     text = HTML.read_text(encoding="utf-8")
-    assert any(v in text for v in ("v10.1.0.4", "v10.1.0.5", "v10.2.0.0", "v10.2.0.1", "v10.2.0.2", "v10.2.0.3", "v10.2.0.4", "v10.2.0.5", "v10.2.0.6", "v10.2.0.7", "v10.2.0.8", "v10.2.0.9"))
+    assert "v10.1.0.4" in text
