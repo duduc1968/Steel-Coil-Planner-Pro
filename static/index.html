@@ -73,6 +73,15 @@
 .hold-stat{display:inline-flex;align-items:center;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;border-radius:999px;padding:3px 8px;font-size:9px;font-weight:900}
 .hold-stat.free{border-color:#cbd5e1;background:#f8fafc;color:#475569}
 @media(max-width:720px){.stowage-dimension-segment{font-size:8px}.stowage-dimension-head{font-size:8px}}
+.condition-list{display:grid;gap:9px;max-height:58vh;overflow:auto;padding:2px}
+.condition-item{border:1px solid #334155;border-radius:11px;background:#0b1220;padding:11px;cursor:pointer}
+.condition-item.active{background:#13264a;border-color:#60a5fa}
+.condition-item.archived{opacity:.62}
+.condition-item b{display:block;color:#f8fafc}
+.condition-item span{display:block;color:#9fb1c8;font-size:11px;margin-top:4px}
+.condition-meta{border:1px solid #334155;background:#111827;border-radius:12px;padding:12px;margin-top:12px;line-height:1.6}
+.condition-meta b{color:#93c5fd}
+.condition-empty{color:#9fb1c8;text-align:center;padding:30px 10px}
 
 /* v9.4.0.15 — Exact longitudinal renderer audit fix */
 .plan-real .rows{left:0;right:0;top:23px;bottom:35px;gap:2px}
@@ -81,12 +90,12 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF5</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · PDF Report 5</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF5 · LC1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · Loading Conditions Library 1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
 <label>Active hold</label><select id="holdSelect"></select>
-<button class="btn dark" id="fleetBtn">Fleet Library</button><button class="btn red" id="newVoyageBtn" style="margin-top:8px">Start New Voyage</button>
+<button class="btn dark" id="fleetBtn">Fleet Library</button><button class="btn dark" id="conditionLibraryBtn" style="margin-top:8px">Loading Conditions Library</button><button class="btn red" id="newVoyageBtn" style="margin-top:8px">Start New Voyage</button>
 <div class="two"><div><label>Hold width m</label><input id="holdWidth" type="number" step="0.01"></div><div><label>Hold length m</label><input id="holdLength" type="number" step="0.01"></div></div>
 <label>Cargo source</label><div class="switch"><button id="cargoListMode" class="active">Cargo List</button><button id="simulationMode">Simulation</button></div>
 <div id="cargoListPanel">
@@ -110,6 +119,7 @@
 <aside class="panel"><div class="pt">Voyage Summary</div><div class="pb" id="summaryBox"></div><div class="pt">Cargo Manager</div><div class="pb" id="cargoManager"><div class="hint">Import cargo or use Simulation Mode.</div></div><div class="pt">Coil Inspector</div><div class="pb" id="coilInspector"><div class="hint">Select a coil from the list, Top View, or Cross Section.</div></div><div class="pt">Cargo Preview</div><div class="pb" id="cargoPreview"><div class="hint">Import cargo or use Simulation Mode.</div></div></aside>
 </main>
 <div class="modalOverlay" id="fleetModal"><div class="modal"><div class="modalHead"><h2>Fleet Library</h2><button class="close" id="closeFleet">Close</button></div><div class="modalBody"><div><div class="pt">Saved ships</div><div id="shipList"></div><button class="btn" id="newShip">New ship</button></div><div><label>Ship name</label><input id="libShipName"><label>Hold selector</label><select id="libHoldSel"></select><div class="formgrid"><div><label>Hold name</label><input id="libHoldName"></div><div><label>Length m</label><input id="libLength" type="number" step="0.01"></div><div><label>Width m</label><input id="libWidth" type="number" step="0.01"></div><div><label>Depth m</label><input id="libDepth" type="number" step="0.01"></div><div><label>Default diameter m</label><input id="libDiam" type="number" step="0.01"></div><div><label>Row gap m</label><input id="libGap" type="number" step="0.01"></div></div><div class="actions"><button class="btn" id="saveShip">Save ship</button><button class="btn dark" id="addHold">Add hold</button><button class="btn red" id="deleteHold">Delete hold</button><button class="btn red" id="deleteShip">Delete ship</button></div><div class="hint" id="fleetStatus"></div></div></div></div></div>
+<div class="modalOverlay" id="conditionLibraryModal"><div class="modal"><div class="modalHead"><h2>Loading Conditions Library</h2><button class="close" id="closeConditionLibrary">Close</button></div><div class="modalBody"><div><div class="pt">Saved conditions</div><div id="conditionList" class="condition-list"></div><button class="btn green" id="saveNewCondition">Save Current Condition</button><button class="btn dark" id="importConditionBtn">Import JSON Backup</button><input id="conditionImportFile" type="file" accept=".json" style="display:none"></div><div><label>Condition name</label><input id="conditionName" placeholder="e.g. Drogdenbank - Pasajes - July 2026"><div class="two"><div><label>Voyage / reference</label><input id="conditionReference"></div><div><label>State</label><select id="conditionState"><option value="draft">Draft</option><option value="validated">Validated</option><option value="loaded">Loaded</option><option value="archived">Archived</option></select></div></div><label>Notes</label><textarea id="conditionNotes" style="width:100%;min-height:90px;resize:vertical;background:#111827;color:#e8f0fb;border:1px solid #334155;border-radius:10px;padding:10px"></textarea><div id="conditionMeta" class="condition-meta"><span class="small">Select a saved condition or save the current plan.</span></div><div class="actions"><button class="btn" id="openCondition">Open / Restore</button><button class="btn green" id="saveConditionVersion">Save New Version</button><button class="btn dark" id="updateConditionDetails">Update Details</button><button class="btn dark" id="duplicateCondition">Duplicate</button><button class="btn dark" id="exportCondition">Download JSON</button><button class="btn dark" id="archiveCondition">Archive</button><button class="btn red" id="deleteCondition">Delete</button></div><div class="hint" id="conditionStatus">The complete validated planning state is stored locally in this browser.</div></div></div></div></div>
 <script>
 // Historical release markers retained for regression tests: v10.1.0.0 · version:'10.1.0.1'
 const DEFAULT_ZONE_UPPER_PORT=3, DEFAULT_ZONE_UPPER_STARBOARD=3;
@@ -119,13 +129,19 @@ const LEGACY_SESSION_KEY='scp_last_session_v1';
 const VOYAGE_DB='scp_voyage_db_v1';
 const CARGO_ZONES_STATE_KEY='scp_cargo_zones_state_v9417';
 const VOYAGE_STORE='voyages';
+const CONDITION_STORE='loading_conditions';
 const ACTIVE_VOYAGE_ID='last-active-voyage';
 let restoredSession=null;
 function loadSession(){try{return JSON.parse(localStorage.getItem(SESSION_KEY))||JSON.parse(localStorage.getItem(LEGACY_SESSION_KEY))||null}catch(e){return null}}
-function openVoyageDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(VOYAGE_DB,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(VOYAGE_STORE))db.createObjectStore(VOYAGE_STORE,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+function openVoyageDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(VOYAGE_DB,2);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(VOYAGE_STORE))db.createObjectStore(VOYAGE_STORE,{keyPath:'id'});if(!db.objectStoreNames.contains(CONDITION_STORE))db.createObjectStore(CONDITION_STORE,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 async function writeVoyageSnapshot(snapshot){try{const db=await openVoyageDB();await new Promise((resolve,reject)=>{const tx=db.transaction(VOYAGE_STORE,'readwrite');tx.objectStore(VOYAGE_STORE).put(snapshot);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();return true}catch(e){console.warn('Voyage database save failed',e);return false}}
 async function readVoyageSnapshot(){try{const db=await openVoyageDB();const result=await new Promise((resolve,reject)=>{const tx=db.transaction(VOYAGE_STORE,'readonly');const req=tx.objectStore(VOYAGE_STORE).get(ACTIVE_VOYAGE_ID);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return result}catch(e){console.warn('Voyage database restore failed',e);return null}}
 async function deleteVoyageSnapshot(){try{const db=await openVoyageDB();await new Promise((resolve,reject)=>{const tx=db.transaction(VOYAGE_STORE,'readwrite');tx.objectStore(VOYAGE_STORE).delete(ACTIVE_VOYAGE_ID);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch(e){console.warn('Voyage database reset failed',e)}}
+async function putLoadingCondition(record){const db=await openVoyageDB();await new Promise((resolve,reject)=>{const tx=db.transaction(CONDITION_STORE,'readwrite');tx.objectStore(CONDITION_STORE).put(record);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();return record}
+async function getLoadingCondition(id){const db=await openVoyageDB();const record=await new Promise((resolve,reject)=>{const tx=db.transaction(CONDITION_STORE,'readonly');const req=tx.objectStore(CONDITION_STORE).get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return record}
+async function listLoadingConditions(){const db=await openVoyageDB();const records=await new Promise((resolve,reject)=>{const tx=db.transaction(CONDITION_STORE,'readonly');const req=tx.objectStore(CONDITION_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});db.close();return records.sort((a,b)=>Date.parse(b.updatedAt||0)-Date.parse(a.updatedAt||0))}
+async function removeLoadingCondition(id){const db=await openVoyageDB();await new Promise((resolve,reject)=>{const tx=db.transaction(CONDITION_STORE,'readwrite');tx.objectStore(CONDITION_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}
+function conditionId(){return crypto.randomUUID?crypto.randomUUID():'condition-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
 const defaultFleet=[{name:'Default coaster',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]},{name:'MV Drogdenbank',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]}];
 let fleet=loadFleet(), activeShip=0, activeHold=0, allocations={}, cargoSource='list', bottomMode='auto', wedgeMode='auto';
 let selectedCoilKey = null;
@@ -139,6 +155,7 @@ let cargoPoolSearch='';
 let cargoPoolFilter='all';
 let cargo={coils:120,totalWeight:2400,avgWeight:20,avgWidth:1.2,avgDiameter:null,rows:[]};
 let cargoFileName='';
+let activeConditionReference='';
 restoredSession=loadSession();
 if(restoredSession){
   activeShip=clamp(Number(restoredSession.activeShip)||0,0,Math.max(0,fleet.length-1));
@@ -153,10 +170,55 @@ if(restoredSession){
   selectedZoneByHold=restoredSession.selectedZoneByHold&&typeof restoredSession.selectedZoneByHold==='object'?restoredSession.selectedZoneByHold:{};
   if(restoredSession.cargo&&typeof restoredSession.cargo==='object')cargo={...cargo,...restoredSession.cargo,rows:Array.isArray(restoredSession.cargo.rows)?restoredSession.cargo.rows:[]};
   cargoFileName=restoredSession.cargoFileName||'';
+  activeConditionReference=restoredSession.activeConditionReference||'';
 }
 let sessionSaveTimer=null;
-function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.1.0.4',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
-function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.1.0.4',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
+function sessionPayload(){const cargoMeta={...cargo,rows:[]};return {version:'10.1.0.4',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold,cargoFileName,activeConditionReference,cargo:cargoMeta,ui:{avgDiameter:avgDiameter?.value,rowGap:rowGap?.value,avgWidth:avgWidth?.value,avgWeight:avgWeight?.value,simCoils:simCoils?.value,simTonnes:simTonnes?.value,bottomPort:bottomPort?.value,bottomStbd:bottomStbd?.value,wedgeCount:wedgeCount?.value}}}
+function voyageSnapshot(){return {id:ACTIVE_VOYAGE_ID,version:'10.1.0.4',savedAt:new Date().toISOString(),activeShip,activeHold,allocations,cargoSource,bottomMode,wedgeMode,workspaceMode,selectedCoilKey,selectedZoneId,selectedZoneByHold:structuredClone(selectedZoneByHold),cargoFileName,activeConditionReference,cargo:structuredClone(cargo),cargoZones:structuredClone(cargoZones),ui:sessionPayload().ui}}
+function completeConditionSnapshot(){
+ const snap=voyageSnapshot();delete snap.id;
+ return {...snap,vessel:structuredClone(ship()),engineFoundation:'F4.3',capturedAt:new Date().toISOString()};
+}
+let selectedConditionId=null;
+function conditionSummary(record){
+ const snap=record?.snapshot||{},savedCargo=snap.cargo||{},zones=Object.values(snap.cargoZones||{}).flat();
+ const validated=zones.filter(z=>z?.validated||z?.manualState==='validated').length;
+ return {ship:snap.vessel?.name||'Unknown vessel',coils:Number(savedCargo.coils||savedCargo.rows?.length||0),weight:Number(savedCargo.totalWeight||0),zones:validated};
+}
+async function renderConditionLibrary(){
+ const records=await listLoadingConditions(),list=document.getElementById('conditionList');
+ if(!records.length){list.innerHTML='<div class="condition-empty">No saved loading conditions yet.</div>';selectedConditionId=null;fillConditionDetails(null);return}
+ if(!records.some(r=>r.id===selectedConditionId))selectedConditionId=records[0].id;
+ list.innerHTML=records.map(r=>{const s=conditionSummary(r);return `<div class="condition-item ${r.id===selectedConditionId?'active':''} ${r.state==='archived'?'archived':''}" data-condition-id="${r.id}"><b>${escapeHtml(r.name)} · v${Number(r.versionNumber||1)}</b><span>${escapeHtml(s.ship)} · ${s.coils} coils · ${s.weight.toFixed(1)} t · ${s.zones} validated zones</span><span>${escapeHtml(String(r.state||'draft').toUpperCase())} · ${new Date(r.updatedAt||r.createdAt).toLocaleString()}</span></div>`}).join('');
+ list.querySelectorAll('[data-condition-id]').forEach(el=>el.onclick=async()=>{selectedConditionId=el.dataset.conditionId;fillConditionDetails(await getLoadingCondition(selectedConditionId));renderConditionLibrary()});
+ fillConditionDetails(await getLoadingCondition(selectedConditionId));
+}
+function fillConditionDetails(record){
+ conditionName.value=record?.name||'';conditionReference.value=record?.reference||'';conditionState.value=record?.state||'draft';conditionNotes.value=record?.notes||'';
+ if(!record){conditionMeta.innerHTML='<span class="small">Save the current loading condition to create the first library entry.</span>';return}
+ const s=conditionSummary(record);
+ conditionMeta.innerHTML=`<b>${escapeHtml(s.ship)}</b><br>Version ${Number(record.versionNumber||1)} · ${s.coils} coils · ${s.weight.toFixed(1)} t · ${s.zones} validated zones<br>Created ${new Date(record.createdAt).toLocaleString()} · Updated ${new Date(record.updatedAt).toLocaleString()}<br>Foundation ${escapeHtml(record.snapshot?.engineFoundation||'F4.3')}`;
+}
+async function saveLoadingCondition(asVersion=false){
+ const selected=asVersion&&selectedConditionId?await getLoadingCondition(selectedConditionId):null;
+ const name=(conditionName.value||selected?.name||'').trim();
+ if(!name){conditionStatus.textContent='Enter a condition name first.';conditionName.focus();return}
+ const now=new Date().toISOString();
+ activeConditionReference=conditionReference.value.trim();
+ const record={format:'SCP_LOADING_CONDITION',schemaVersion:1,id:conditionId(),name,reference:activeConditionReference,state:conditionState.value,notes:conditionNotes.value.trim(),createdAt:selected?.createdAt||now,updatedAt:now,versionNumber:selected?Number(selected.versionNumber||1)+1:1,parentId:selected?.parentId||selected?.id||null,snapshot:completeConditionSnapshot()};
+ await putLoadingCondition(record);selectedConditionId=record.id;conditionStatus.textContent=asVersion?'New version saved.':'Loading condition saved.';await renderConditionLibrary();
+}
+async function restoreLoadingCondition(record){
+ if(!record?.snapshot)return false;
+ const snap=structuredClone(record.snapshot);clearTimeout(sessionSaveTimer);sessionSaveTimer=null;
+ if(snap.vessel){const idx=fleet.findIndex(v=>v.name===snap.vessel.name);if(idx>=0){fleet[idx]=structuredClone(snap.vessel);activeShip=idx}else{fleet.push(structuredClone(snap.vessel));activeShip=fleet.length-1}localStorage.setItem(FKEY,JSON.stringify(fleet))}
+ activeHold=clamp(Number(snap.activeHold)||0,0,Math.max(0,ship().holds.length-1));allocations=structuredClone(snap.allocations||{});
+ cargoSource=snap.cargoSource==='sim'?'sim':'list';bottomMode=snap.bottomMode==='manual'?'manual':'auto';wedgeMode=snap.wedgeMode==='manual'?'manual':'auto';workspaceMode=['zones','pool','stowage'].includes(snap.workspaceMode)?snap.workspaceMode:'zones';
+ selectedCoilKey=snap.selectedCoilKey||null;selectedZoneId=snap.selectedZoneId||null;selectedZoneByHold=structuredClone(snap.selectedZoneByHold||{});cargoFileName=snap.cargoFileName||'';activeConditionReference=record.reference||snap.activeConditionReference||'';cargo=structuredClone(snap.cargo||cargo);cargoZones=structuredClone(snap.cargoZones||{});
+ restoredSession={...snap,activeShip,activeHold};localStorage.setItem('scp_cargo_zones_v821',JSON.stringify(cargoZones));localStorage.setItem(CARGO_ZONES_STATE_KEY,JSON.stringify({savedAt:new Date().toISOString(),zones:cargoZones,selectedZoneId,selectedZoneByHold}));
+ renderSelectors();restoreSessionUI();setCargoMode();setBottomMode();setWedgeMode();initAllocations();renderWorkspace();renderZoneWorkspace();setWorkspaceMode(workspaceMode);renderCargoPreview(true);saveSessionNow();
+ statusBadge.textContent=`Restored: ${record.name} · v${Number(record.versionNumber||1)}`;return true;
+}
 function saveSessionNow(){try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()));localStorage.removeItem(LEGACY_SESSION_KEY)}catch(e){console.warn('Session metadata save failed',e)}writeVoyageSnapshot(voyageSnapshot())}
 function saveSession(){clearTimeout(sessionSaveTimer);sessionSaveTimer=setTimeout(saveSessionNow,120)}
 function renderCargoPreview(restored=false){
@@ -209,7 +271,7 @@ async function restoreVoyageFromDatabase(){
   cargoSource=snap.cargoSource==='sim'?'sim':'list';bottomMode=snap.bottomMode==='manual'?'manual':'auto';wedgeMode=snap.wedgeMode==='manual'?'manual':'auto';
   workspaceMode=['zones','pool','stowage'].includes(snap.workspaceMode)?snap.workspaceMode:'zones';selectedCoilKey=snap.selectedCoilKey||null;
   selectedZoneId=snap.selectedZoneId||null;selectedZoneByHold=snap.selectedZoneByHold&&typeof snap.selectedZoneByHold==='object'?snap.selectedZoneByHold:{};
-  cargoFileName=snap.cargoFileName||'';
+ cargoFileName=snap.cargoFileName||'';activeConditionReference=snap.activeConditionReference||'';
   if(snap.cargo&&typeof snap.cargo==='object')cargo={...cargo,...snap.cargo,rows:Array.isArray(snap.cargo.rows)?snap.cargo.rows:[]};
   const localState=readCargoZonesState();cargoZones=mergeCargoZoneStores(snap.cargoZones,localState?.zones);
   if(localState?.selectedZoneByHold&&typeof localState.selectedZoneByHold==='object')selectedZoneByHold={...selectedZoneByHold,...localState.selectedZoneByHold};
@@ -222,7 +284,7 @@ async function startNewVoyage(){
  if(!confirm('Start a new voyage? Ship Library and hold dimensions will be kept. Cargo list, zones, reservations and stowage plan will be cleared.'))return;
  // Stop a delayed save from restoring the voyage that is being deleted.
  clearTimeout(sessionSaveTimer);sessionSaveTimer=null;
- allocations={};cargoZones={};selectedZoneId=null;selectedZoneByHold={};selectedCoilKey=null;cargoFileName='';cargoSource='list';
+ allocations={};cargoZones={};selectedZoneId=null;selectedZoneByHold={};selectedCoilKey=null;cargoFileName='';activeConditionReference='';cargoSource='list';
  cargo={coils:0,totalWeight:0,avgWeight:20,avgWidth:1.2,avgDiameter:null,rows:[]};
  localStorage.removeItem('scp_cargo_zones_v821');localStorage.removeItem('scp_selected_zone_v9');localStorage.removeItem(CARGO_ZONES_STATE_KEY);localStorage.removeItem(SESSION_KEY);localStorage.removeItem(LEGACY_SESSION_KEY);
  await deleteVoyageSnapshot();
@@ -1367,7 +1429,7 @@ function stowagePdfPayload(){
   return {
     build:'Foundation 4.3 - PDF Report 5',
     generated_at:new Date().toISOString().replace('T',' ').slice(0,16)+' UTC',
-    reference:cargoFileName||'Simulation Mode',
+    reference:activeConditionReference||cargoFileName||'Simulation Mode',
     cargo_description:'Steel coils',
     ship:{name:vessel.name},
     totals:{
@@ -1433,6 +1495,18 @@ function renderFleet(){shipList.innerHTML=fleet.map((s,idx)=>`<div class="shipIt
 function fillFleetForm(){const s=ship(),h=hold();libShipName.value=s.name;libHoldSel.innerHTML=s.holds.map((x,idx)=>({x,idx})).reverse().map(o=>`<option value="${o.idx}">${o.x.name}</option>`).join('');libHoldSel.value=activeHold;libHoldName.value=h.name;libLength.value=h.length;libWidth.value=h.width;libDepth.value=h.depth||'';libDiam.value=h.diameter||1.8;libGap.value=h.rowGap||.15}
 function saveFleetForm(){const s=ship();s.name=libShipName.value||'Unnamed ship';let h=s.holds[activeHold];h.name=libHoldName.value||('Hold '+(activeHold+1));h.length=n(libLength.value,48);h.width=n(libWidth.value,11.5);h.depth=n(libDepth.value,null);h.diameter=n(libDiam.value,1.8);h.rowGap=n(libGap.value,.15);saveFleet();renderSelectors();fillFleetForm();renderFleet();build();fleetStatus.textContent='Saved.'}
 fleetBtn.onclick=()=>{fleetModal.style.display='flex';renderFleet();fillFleetForm()};closeFleet.onclick=()=>fleetModal.style.display='none';saveShip.onclick=saveFleetForm;libHoldSel.onchange=()=>{activeHold=Number(libHoldSel.value);fillFleetForm()};addHold.onclick=()=>{ship().holds.push({name:'Hold '+(ship().holds.length+1),length:48,width:11.5,diameter:1.8,rowGap:.15});activeHold=ship().holds.length-1;saveFleet();renderFleet();fillFleetForm();renderSelectors();build()};deleteHold.onclick=()=>{if(ship().holds.length>1){ship().holds.splice(activeHold,1);activeHold=0;saveFleet();renderFleet();fillFleetForm();renderSelectors();build()}};newShip.onclick=()=>{fleet.push({name:'New vessel',holds:[{name:'Hold 1',length:48,width:11.5,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,diameter:1.8,rowGap:.15}]});activeShip=fleet.length-1;activeHold=0;saveFleet();renderFleet();fillFleetForm();renderSelectors();build()};deleteShip.onclick=()=>{if(fleet.length>1){fleet.splice(activeShip,1);activeShip=0;activeHold=0;saveFleet();renderFleet();fillFleetForm();renderSelectors();build()}};
+conditionLibraryBtn.onclick=async()=>{conditionLibraryModal.style.display='flex';conditionStatus.textContent='The complete validated planning state is stored locally in this browser.';await renderConditionLibrary()};
+closeConditionLibrary.onclick=()=>conditionLibraryModal.style.display='none';
+saveNewCondition.onclick=()=>saveLoadingCondition(false);
+saveConditionVersion.onclick=()=>saveLoadingCondition(true);
+openCondition.onclick=async()=>{const record=await getLoadingCondition(selectedConditionId);if(!record){conditionStatus.textContent='Select a saved condition first.';return}if(!confirm(`Open "${record.name}" version ${record.versionNumber||1}? The current unsaved workspace will be replaced.`))return;await restoreLoadingCondition(record);conditionLibraryModal.style.display='none'};
+updateConditionDetails.onclick=async()=>{const record=await getLoadingCondition(selectedConditionId);if(!record){conditionStatus.textContent='Select a saved condition first.';return}const name=conditionName.value.trim();if(!name){conditionStatus.textContent='Condition name cannot be empty.';return}Object.assign(record,{name,reference:conditionReference.value.trim(),state:conditionState.value,notes:conditionNotes.value.trim(),updatedAt:new Date().toISOString()});await putLoadingCondition(record);conditionStatus.textContent='Condition details updated.';await renderConditionLibrary()};
+duplicateCondition.onclick=async()=>{const source=await getLoadingCondition(selectedConditionId);if(!source){conditionStatus.textContent='Select a saved condition first.';return}const now=new Date().toISOString(),copy=structuredClone(source);Object.assign(copy,{id:conditionId(),name:`${source.name} - Copy`,state:'draft',createdAt:now,updatedAt:now,versionNumber:1,parentId:null});await putLoadingCondition(copy);selectedConditionId=copy.id;conditionStatus.textContent='Condition duplicated as a new draft.';await renderConditionLibrary()};
+exportCondition.onclick=async()=>{const record=await getLoadingCondition(selectedConditionId);if(!record){conditionStatus.textContent='Select a saved condition first.';return}const blob=new Blob([JSON.stringify(record,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${record.name.replace(/[^a-z0-9_-]+/gi,'_')}_v${record.versionNumber||1}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);conditionStatus.textContent='JSON backup downloaded.'};
+archiveCondition.onclick=async()=>{const record=await getLoadingCondition(selectedConditionId);if(!record){conditionStatus.textContent='Select a saved condition first.';return}record.state=record.state==='archived'?'draft':'archived';record.updatedAt=new Date().toISOString();await putLoadingCondition(record);conditionStatus.textContent=record.state==='archived'?'Condition archived.':'Condition returned to Draft.';await renderConditionLibrary()};
+deleteCondition.onclick=async()=>{const record=await getLoadingCondition(selectedConditionId);if(!record){conditionStatus.textContent='Select a saved condition first.';return}if(!confirm(`Delete "${record.name}" version ${record.versionNumber||1}? This cannot be undone unless you exported a JSON backup.`))return;await removeLoadingCondition(record.id);selectedConditionId=null;conditionStatus.textContent='Condition deleted.';await renderConditionLibrary()};
+importConditionBtn.onclick=()=>conditionImportFile.click();
+conditionImportFile.onchange=async()=>{const file=conditionImportFile.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(imported?.format!=='SCP_LOADING_CONDITION'||!imported.snapshot?.vessel||!imported.snapshot?.cargo)throw new Error('Not a valid Steel Coil Planner loading-condition backup.');const now=new Date().toISOString(),record=structuredClone(imported);record.id=conditionId();record.name=`${record.name||'Imported condition'} - Imported`;record.createdAt=now;record.updatedAt=now;await putLoadingCondition(record);selectedConditionId=record.id;conditionStatus.textContent='JSON backup imported.';await renderConditionLibrary()}catch(error){conditionStatus.textContent=error.message}finally{conditionImportFile.value=''}};
 // v9.3.4: selecting a hold in Cargo Zones automatically selects its most recently
 // edited zone and opens that zone's complete option editor. A hold without zones
 // remains ready for drag-to-create without inventing cargo or geometry.
