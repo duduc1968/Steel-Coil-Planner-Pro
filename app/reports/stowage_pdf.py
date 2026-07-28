@@ -228,8 +228,25 @@ class StowagePdf:
         for hold in ordered:
             hold_length = max(0.01, _number(hold.get("length_m"), 1))
             hw = usable * hold_length / total_length
-            inner_y = y + 18
-            inner_h = height - 36
+            inner_y = y + 33
+            inner_h = height - 51
+            # Compartment outline. Hold 1 has the sloped forward end seen in the
+            # vessel's cargo-plan scheme; the rectangular inset is the saved
+            # coil-suitable space used by the planner.
+            compartment = c.beginPath()
+            compartment.moveTo(cursor - 3, inner_y - 5)
+            compartment.lineTo(cursor - 3, inner_y + inner_h + 5)
+            if int("".join(ch for ch in _text(hold.get("name")) if ch.isdigit()) or 0) == 1:
+                compartment.lineTo(cursor + hw + 3, inner_y + inner_h - 4)
+                compartment.lineTo(cursor + hw + 3, inner_y + 4)
+            else:
+                compartment.lineTo(cursor + hw + 3, inner_y + inner_h + 5)
+                compartment.lineTo(cursor + hw + 3, inner_y - 5)
+            compartment.close()
+            c.setFillColor(colors.HexColor("#e2e8f0"))
+            c.setStrokeColor(NAVY)
+            c.setLineWidth(1)
+            c.drawPath(compartment, fill=1, stroke=1)
             c.setFillColor(colors.white)
             c.setStrokeColor(NAVY)
             c.setLineWidth(1.2)
@@ -265,9 +282,43 @@ class StowagePdf:
             c.setFont("Helvetica", 6.5)
             c.drawCentredString(
                 cursor + hw / 2,
-                y + 5,
-                f"{hold_length:.2f} m",
+                inner_y + inner_h - 9,
+                "COIL-SUITABLE SPACE",
             )
+
+            # Dimension chain follows the saved hold length and validated-zone
+            # boundaries, matching the ruler logic used in Cargo Distribution.
+            boundaries = {0.0, hold_length}
+            for zone in hold.get("zones", []):
+                boundaries.add(max(0.0, min(hold_length, _number(zone.get("start_m")))))
+                boundaries.add(
+                    max(
+                        0.0,
+                        min(
+                            hold_length,
+                            _number(zone.get("start_m"))
+                            + _number(zone.get("used_length_m")),
+                        ),
+                    )
+                )
+            points = sorted(boundaries)
+            dim_y = y + 18
+            c.setStrokeColor(SLATE)
+            c.setFillColor(SLATE)
+            c.setLineWidth(0.55)
+            for left, right in zip(points, points[1:]):
+                lx = cursor + hw * left / hold_length
+                rx = cursor + hw * right / hold_length
+                c.line(lx + 2, dim_y, rx - 2, dim_y)
+                c.line(lx + 2, dim_y, lx + 5, dim_y + 2)
+                c.line(lx + 2, dim_y, lx + 5, dim_y - 2)
+                c.line(rx - 2, dim_y, rx - 5, dim_y + 2)
+                c.line(rx - 2, dim_y, rx - 5, dim_y - 2)
+                c.setFont("Helvetica-Bold", 5.8)
+                c.drawCentredString((lx + rx) / 2, dim_y + 3, f"{right-left:.2f} m")
+            c.setFont("Helvetica", 5.5)
+            c.drawString(cursor, y + 7, "0.00")
+            c.drawRightString(cursor + hw, y + 7, f"{hold_length:.2f} m")
             cursor += hw + gap
 
         c.setFillColor(NAVY)
@@ -498,8 +549,6 @@ class StowagePdf:
         if not holds or not any(hold.get("zones") for hold in holds):
             raise ValueError("The PDF requires at least one validated cargo zone.")
         self.cover_page()
-        self.zone_pages()
-        self.manifest_pages()
         self.c.save()
         return self.output_path
 

@@ -8,9 +8,11 @@ Foundation 4.3 application.
 - Exports validated cargo zones only.
 - Uses the exact validated browser state; it does not optimize, recalculate, or
   rearrange cargo.
+- Produces one A4 landscape page only.
 - Includes the loading-condition summary, a continuous vessel cargo-distribution
-  view with Hold 1 forward and subsequent holds toward the stern, validated-zone cross
-  sections, coil manifest, legend, and signature fields.
+  view with Hold 1 forward and subsequent holds toward the stern, a distance chain
+  derived from saved hold lengths and validated-zone boundaries, a legend, and
+  signature fields.
 - Adds `POST /api/export-stowage-pdf` and a **Download Stowage Plan PDF** button.
 
 ## Deployment

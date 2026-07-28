@@ -106,14 +106,15 @@ def sample_payload():
 def test_pdf_is_a4_landscape_and_contains_expected_sections(tmp_path):
     output = build_stowage_pdf(sample_payload(), tmp_path / "plan.pdf")
     reader = PdfReader(output)
-    assert len(reader.pages) == 5
+    assert len(reader.pages) == 1
     page = reader.pages[0]
     assert float(page.mediabox.width) > float(page.mediabox.height)
     assert round(float(page.mediabox.width)) == 842
     text = "\n".join((p.extract_text() or "") for p in reader.pages)
     assert "CARGO STOWAGE PLAN - LOADING CONDITION" in text
-    assert "VALIDATED CARGO ZONES" in text
-    assert "COIL MANIFEST - VALIDATED LOADING CONDITION" in text
+    assert "VALIDATED CARGO ZONES" not in text
+    assert "COIL MANIFEST - VALIDATED LOADING CONDITION" not in text
+    assert "COIL-SUITABLE SPACE" in text
     assert "MV Test Vessel" in text
     assert "Hold 1" in text and "Hold 2" in text
 
