@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A3, landscape
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
 
-PAGE_SIZE = landscape(A3)
+PAGE_SIZE = landscape(A4)
 PAGE_W, PAGE_H = PAGE_SIZE
 MARGIN = 28
 NAVY = colors.HexColor("#0f172a")
@@ -174,17 +174,133 @@ class StowagePdf:
         c.drawCentredString(0, 0, "STARBOARD")
         c.restoreState()
 
+    def draw_ship_distribution(self, holds: list[dict[str, Any]], x, y, width, height):
+        """Draw all holds inside one vessel outline, AFT left and FORE right."""
+        c = self.c
+        ordered = sorted(
+            holds,
+            key=lambda h: int("".join(ch for ch in _text(h.get("name")) if ch.isdigit()) or 0),
+            reverse=True,
+        )
+        stern_w = width * 0.12
+        bow_w = width * 0.12
+        cargo_x = x + stern_w
+        cargo_w = width - stern_w - bow_w
+        total_length = sum(max(0.01, _number(h.get("length_m"), 1)) for h in ordered)
+
+        hull = c.beginPath()
+        hull.moveTo(x + 8, y + 10)
+        hull.curveTo(x, y + height * 0.22, x, y + height * 0.78, x + 8, y + height - 10)
+        hull.lineTo(x + width - bow_w * 0.55, y + height - 10)
+        hull.curveTo(
+            x + width - bow_w * 0.10,
+            y + height - 8,
+            x + width,
+            y + height * 0.64,
+            x + width,
+            y + height / 2,
+        )
+        hull.curveTo(
+            x + width,
+            y + height * 0.36,
+            x + width - bow_w * 0.10,
+            y + 8,
+            x + width - bow_w * 0.55,
+            y + 10,
+        )
+        hull.close()
+        c.setFillColor(colors.HexColor("#f1f5f9"))
+        c.setStrokeColor(NAVY)
+        c.setLineWidth(2)
+        c.drawPath(hull, fill=1, stroke=1)
+
+        # A simple superstructure cue makes the plan read as one real vessel.
+        c.setFillColor(colors.white)
+        c.setStrokeColor(NAVY)
+        c.rect(x + 12, y + 20, stern_w - 20, height - 40, fill=1, stroke=1)
+        c.setFillColor(NAVY)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(x + stern_w / 2, y + height / 2 - 2, "AFT")
+
+        cursor = cargo_x
+        gap = 5
+        usable = cargo_w - gap * max(0, len(ordered) - 1)
+        for hold in ordered:
+            hold_length = max(0.01, _number(hold.get("length_m"), 1))
+            hw = usable * hold_length / total_length
+            inner_y = y + 18
+            inner_h = height - 36
+            c.setFillColor(colors.white)
+            c.setStrokeColor(NAVY)
+            c.setLineWidth(1.2)
+            c.rect(cursor, inner_y, hw, inner_h, fill=1, stroke=1)
+
+            for zone in hold.get("zones", []):
+                start = _number(zone.get("start_m"))
+                used = _number(zone.get("used_length_m"))
+                zx = cursor + hw * start / hold_length
+                zw = max(1, hw * used / hold_length)
+                c.setFillColor(ZONE_GREEN)
+                c.setStrokeColor(GREEN)
+                c.rect(zx, inner_y, zw, inner_h, fill=1, stroke=1)
+
+            hold_width = max(0.01, _number(hold.get("width_m"), 1))
+            for item in hold.get("coils", []):
+                start = _number(item.get("block_start_m"))
+                coil_width = max(0.01, _number(item.get("block_width_m"), 0.01))
+                transverse = _number(item.get("transverse_x_m"))
+                diameter = max(0.05, _number(item.get("diameter_m"), 1.8))
+                cx = cursor + hw * start / hold_length
+                cw = max(1.2, hw * coil_width / hold_length)
+                center_y = inner_y + inner_h / 2 - inner_h * transverse / hold_width
+                ch = max(2.5, min(inner_h * 0.18, inner_h * diameter / hold_width))
+                c.setFillColor(_tier_color(item.get("tier")))
+                c.setStrokeColor(NAVY)
+                c.setLineWidth(0.25)
+                c.roundRect(cx, center_y - ch / 2, cw, ch, 1, fill=1, stroke=1)
+
+            c.setFillColor(NAVY)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawCentredString(cursor + hw / 2, y + height + 6, _text(hold.get("name")))
+            c.setFont("Helvetica", 6.5)
+            c.drawCentredString(
+                cursor + hw / 2,
+                y + 5,
+                f"{hold_length:.2f} m",
+            )
+            cursor += hw + gap
+
+        c.setFillColor(NAVY)
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(x, y - 12, "AFT / STERN")
+        c.drawRightString(x + width, y - 12, "FORE / BOW")
+        c.saveState()
+        c.translate(x - 8, y + height / 2)
+        c.rotate(90)
+        c.drawCentredString(0, 0, "PORT")
+        c.restoreState()
+        c.saveState()
+        c.translate(x + width + 8, y + height / 2)
+        c.rotate(-90)
+        c.drawCentredString(0, 0, "STARBOARD")
+        c.restoreState()
+
     def cover_page(self):
         self.header("CARGO STOWAGE PLAN - LOADING CONDITION")
         c = self.c
         ship = self.payload.get("ship", {})
         totals = self.payload.get("totals", {})
         y = PAGE_H - 82
-        self.label_value(MARGIN, y, "Vessel", ship.get("name"), 240)
-        self.label_value(290, y, "Voyage / reference", self.payload.get("reference", "-"))
-        self.label_value(525, y, "Cargo", self.payload.get("cargo_description", "Steel coils"))
-        self.label_value(735, y, "Generated", self.payload.get("generated_at", "-"))
-        self.label_value(930, y, "Status", "VALIDATED PLAN")
+        field_w = (PAGE_W - 2 * MARGIN) / 5
+        fields = [
+            ("Vessel", ship.get("name")),
+            ("Voyage / reference", self.payload.get("reference", "-")),
+            ("Cargo", self.payload.get("cargo_description", "Steel coils")),
+            ("Generated", self.payload.get("generated_at", "-")),
+            ("Status", "VALIDATED PLAN"),
+        ]
+        for idx, (label, value) in enumerate(fields):
+            self.label_value(MARGIN + idx * field_w, y, label, value, field_w - 8)
 
         y -= 48
         c.setFillColor(colors.HexColor("#eff6ff"))
@@ -203,21 +319,23 @@ class StowagePdf:
 
         self.draw_zone_legend(MARGIN, y - 43)
         holds = self.payload.get("holds", [])
-        available_h = y - 100
-        band_h = min(145, max(82, available_h / max(1, len(holds)) - 28))
-        current_y = y - 88 - band_h
-        for hold in holds:
-            self.draw_hold_plan(hold, MARGIN + 20, current_y, PAGE_W - 2 * MARGIN - 40, band_h)
-            current_y -= band_h + 32
+        self.draw_ship_distribution(
+            holds,
+            MARGIN + 22,
+            180,
+            PAGE_W - 2 * MARGIN - 44,
+            155,
+        )
 
         c.setStrokeColor(LINE)
         c.rect(MARGIN, 42, PAGE_W - 2 * MARGIN, 45, fill=0, stroke=1)
         c.setFillColor(SLATE)
         c.setFont("Helvetica", 8)
         c.drawString(MARGIN + 8, 73, "Prepared by")
-        c.drawString(MARGIN + 300, 73, "Checked by")
-        c.drawString(MARGIN + 590, 73, "Master approval")
-        c.drawString(MARGIN + 875, 73, "Date / signature")
+        signature_col = (PAGE_W - 2 * MARGIN) / 4
+        c.drawString(MARGIN + signature_col, 73, "Checked by")
+        c.drawString(MARGIN + signature_col * 2, 73, "Master approval")
+        c.drawString(MARGIN + signature_col * 3, 73, "Date / signature")
         self.finish_page()
 
     def draw_cross_section(self, zone: dict[str, Any], x, y, width, height):
@@ -257,12 +375,11 @@ class StowagePdf:
             for hold in self.payload.get("holds", [])
             for zone in hold.get("zones", [])
         ]
-        for index in range(0, len(zones), 2):
+        for index in range(0, len(zones)):
             self.header("VALIDATED CARGO ZONES")
-            y_top = PAGE_H - 72
-            card_h = (PAGE_H - 112) / 2
-            for offset, (hold, zone) in enumerate(zones[index : index + 2]):
-                y = y_top - (offset + 1) * card_h + 8
+            card_h = PAGE_H - 112
+            for hold, zone in zones[index : index + 1]:
+                y = 34
                 c.setFillColor(colors.white)
                 c.setStrokeColor(LINE)
                 c.roundRect(MARGIN, y, PAGE_W - 2 * MARGIN, card_h - 12, 6, fill=1, stroke=1)
@@ -290,10 +407,10 @@ class StowagePdf:
                     },
                     MARGIN + 15,
                     y + 15,
-                    430,
+                    365,
                     card_h - 78,
                 )
-                table_x = MARGIN + 470
+                table_x = MARGIN + 405
                 details = [
                     ("Cargo type", zone.get("cargo_type", "Steel coils")),
                     ("Planning mode", zone.get("planning_mode")),
@@ -312,7 +429,7 @@ class StowagePdf:
                     c.drawString(table_x, yy, label.upper())
                     c.setFillColor(NAVY)
                     c.setFont("Helvetica", 8.5)
-                    c.drawString(table_x + 145, yy, _fit_text(c, value, 360, 8.5))
+                    c.drawString(table_x + 115, yy, _fit_text(c, value, 250, 8.5))
             self.finish_page()
 
     def manifest_pages(self):
@@ -323,18 +440,18 @@ class StowagePdf:
         ]
         if not rows:
             return
-        per_page = 38
+        per_page = 26
         columns = [
-            ("ID", 160),
-            ("HOLD", 130),
-            ("ZONE", 170),
-            ("ROW", 60),
-            ("POSITION", 100),
-            ("TIER", 100),
-            ("WEIGHT T", 100),
-            ("DIA M", 90),
-            ("WIDTH M", 100),
-            ("AFT M", 90),
+            ("ID", 112),
+            ("HOLD", 93),
+            ("ZONE", 122),
+            ("ROW", 43),
+            ("POSITION", 72),
+            ("TIER", 72),
+            ("WEIGHT T", 72),
+            ("DIA M", 64),
+            ("WIDTH M", 72),
+            ("AFT M", 64),
         ]
         for start in range(0, len(rows), per_page):
             self.header("COIL MANIFEST - VALIDATED LOADING CONDITION")
