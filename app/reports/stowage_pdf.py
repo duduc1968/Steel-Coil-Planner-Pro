@@ -228,16 +228,31 @@ class StowagePdf:
 
         cursor = cargo_x
         gap = 5
-        usable = cargo_w - gap * max(0, len(ordered) - 1 + (1 if fore_pocket_m else 0))
+        usable = cargo_w - gap * max(0, len(ordered) - 1)
         for hold_index, hold in enumerate(ordered):
             hold_length = max(0.01, _number(hold.get("length_m"), 1))
             hw = usable * hold_length / total_length
-            inner_y = y + 33
             inner_h = height - 51
+            inner_y = y + (height - inner_h) / 2
+            is_fore_hold = fore_pocket_m > 0 and hold_index == len(ordered) - 1
             c.setFillColor(colors.white)
             c.setStrokeColor(NAVY)
             c.setLineWidth(1.2)
-            c.rect(cursor, inner_y, hw, inner_h, fill=1, stroke=1)
+            if is_fore_hold:
+                void_h = inner_h * 0.27
+                c.rect(cursor, inner_y, hw, inner_h, fill=1, stroke=0)
+                c.line(cursor, inner_y, cursor + hw, inner_y)
+                c.line(cursor, inner_y + inner_h, cursor + hw, inner_y + inner_h)
+                c.line(cursor, inner_y, cursor, inner_y + inner_h)
+                c.line(cursor + hw, inner_y, cursor + hw, inner_y + void_h)
+                c.line(
+                    cursor + hw,
+                    inner_y + inner_h - void_h,
+                    cursor + hw,
+                    inner_y + inner_h,
+                )
+            else:
+                c.rect(cursor, inner_y, hw, inner_h, fill=1, stroke=1)
 
             for zone in hold.get("zones", []):
                 start = _number(zone.get("start_m"))
@@ -307,21 +322,21 @@ class StowagePdf:
             c.drawString(cursor, y - 29, "0.00")
             c.drawRightString(cursor + hw, y - 29, f"{hold_length:.2f} m")
             cursor += hw
-            if hold_index < len(ordered) - 1 or fore_pocket_m:
+            if hold_index < len(ordered) - 1:
                 cursor += gap
 
         if fore_pocket_m:
             pocket_w = usable * fore_pocket_m / total_length
-            pocket_y = y + 33
             pocket_h = height - 51
+            pocket_y = y + (height - pocket_h) / 2
             void_h = pocket_h * 0.27
             center_y = pocket_y + void_h
             center_h = pocket_h - 2 * void_h
             c.setFillColor(colors.white)
+            c.rect(cursor, center_y, pocket_w, center_h, fill=1, stroke=0)
+            c.setFillColor(colors.HexColor("#e5e7eb"))
             c.setStrokeColor(NAVY)
             c.setLineWidth(1.2)
-            c.rect(cursor, center_y, pocket_w, center_h, fill=1, stroke=1)
-            c.setFillColor(colors.HexColor("#e5e7eb"))
             c.rect(cursor, pocket_y, pocket_w, void_h, fill=1, stroke=1)
             c.rect(
                 cursor,
@@ -330,6 +345,12 @@ class StowagePdf:
                 void_h,
                 fill=1,
                 stroke=1,
+            )
+            c.line(
+                cursor + pocket_w,
+                center_y,
+                cursor + pocket_w,
+                center_y + center_h,
             )
             c.setStrokeColor(LINE)
             step = 8

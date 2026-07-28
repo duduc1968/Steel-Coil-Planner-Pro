@@ -90,7 +90,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF6 · LC1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · PDF Report 6 · LC Library 1</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF7 · LC1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · PDF Report 7 · LC Library 1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -1427,7 +1427,7 @@ function stowagePdfPayload(){
   });
   const allCoils=holds.flatMap(h=>h.coils),allZones=holds.flatMap(h=>h.zones);
   return {
-    build:'Foundation 4.3 - PDF Report 6',
+    build:'Foundation 4.3 - PDF Report 7',
     generated_at:new Date().toISOString().replace('T',' ').slice(0,16)+' UTC',
     reference:activeConditionReference||cargoFileName||'Simulation Mode',
     cargo_description:'Steel coils',
