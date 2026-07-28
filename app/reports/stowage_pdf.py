@@ -300,8 +300,8 @@ class StowagePdf:
         c.setFont("Helvetica-Bold", 7)
         c.drawString(x, y - 12, "AFT / STERN")
         c.drawRightString(x + width, y - 12, "FORE / BOW")
-        c.drawCentredString(x + width * 0.25, y + height + 25, "PORT")
-        c.drawCentredString(x + width * 0.75, y + height + 25, "STARBOARD")
+        c.drawCentredString(x + width / 2, y + height + 25, "PORT")
+        c.drawCentredString(x + width / 2, y - 12, "STARBOARD")
 
     def cover_page(self):
         self.header("CARGO STOWAGE PLAN - LOADING CONDITION")
