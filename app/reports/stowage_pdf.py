@@ -174,7 +174,15 @@ class StowagePdf:
         c.drawCentredString(0, 0, "STARBOARD")
         c.restoreState()
 
-    def draw_ship_distribution(self, holds: list[dict[str, Any]], x, y, width, height):
+    def draw_ship_distribution(
+        self,
+        holds: list[dict[str, Any]],
+        x,
+        y,
+        width,
+        height,
+        fore_pocket_m=0.0,
+    ):
         """Draw all holds inside one vessel outline, AFT left and FORE right."""
         c = self.c
         ordered = sorted(
@@ -186,7 +194,11 @@ class StowagePdf:
         end_margin = width * 0.055
         cargo_x = x + end_margin
         cargo_w = width - 2 * end_margin
-        total_length = sum(max(0.01, _number(h.get("length_m"), 1)) for h in ordered)
+        fore_pocket_m = max(0.0, _number(fore_pocket_m))
+        total_length = (
+            sum(max(0.01, _number(h.get("length_m"), 1)) for h in ordered)
+            + fore_pocket_m
+        )
 
         hull = c.beginPath()
         hull.moveTo(x + 8, y + 10)
@@ -216,8 +228,8 @@ class StowagePdf:
 
         cursor = cargo_x
         gap = 5
-        usable = cargo_w - gap * max(0, len(ordered) - 1)
-        for hold in ordered:
+        usable = cargo_w - gap * max(0, len(ordered) - 1 + (1 if fore_pocket_m else 0))
+        for hold_index, hold in enumerate(ordered):
             hold_length = max(0.01, _number(hold.get("length_m"), 1))
             hw = usable * hold_length / total_length
             inner_y = y + 33
@@ -277,7 +289,7 @@ class StowagePdf:
                     )
                 )
             points = sorted(boundaries)
-            dim_y = y + 18
+            dim_y = y - 17
             c.setStrokeColor(SLATE)
             c.setFillColor(SLATE)
             c.setLineWidth(0.55)
@@ -292,16 +304,85 @@ class StowagePdf:
                 c.setFont("Helvetica-Bold", 5.8)
                 c.drawCentredString((lx + rx) / 2, dim_y + 3, f"{right-left:.2f} m")
             c.setFont("Helvetica", 5.5)
-            c.drawString(cursor, y + 7, "0.00")
-            c.drawRightString(cursor + hw, y + 7, f"{hold_length:.2f} m")
-            cursor += hw + gap
+            c.drawString(cursor, y - 29, "0.00")
+            c.drawRightString(cursor + hw, y - 29, f"{hold_length:.2f} m")
+            cursor += hw
+            if hold_index < len(ordered) - 1 or fore_pocket_m:
+                cursor += gap
+
+        if fore_pocket_m:
+            pocket_w = usable * fore_pocket_m / total_length
+            pocket_y = y + 33
+            pocket_h = height - 51
+            void_h = pocket_h * 0.27
+            center_y = pocket_y + void_h
+            center_h = pocket_h - 2 * void_h
+            c.setFillColor(colors.white)
+            c.setStrokeColor(NAVY)
+            c.setLineWidth(1.2)
+            c.rect(cursor, center_y, pocket_w, center_h, fill=1, stroke=1)
+            c.setFillColor(colors.HexColor("#e5e7eb"))
+            c.rect(cursor, pocket_y, pocket_w, void_h, fill=1, stroke=1)
+            c.rect(
+                cursor,
+                pocket_y + pocket_h - void_h,
+                pocket_w,
+                void_h,
+                fill=1,
+                stroke=1,
+            )
+            c.setStrokeColor(LINE)
+            step = 8
+            hatch_x = cursor - void_h
+            while hatch_x < cursor + pocket_w:
+                for base_y in (pocket_y, pocket_y + pocket_h - void_h):
+                    c.line(
+                        max(cursor, hatch_x),
+                        base_y,
+                        min(cursor + pocket_w, hatch_x + void_h),
+                        base_y + void_h,
+                    )
+                hatch_x += step
+            c.setFillColor(NAVY)
+            c.setFont("Helvetica-Bold", 5.8)
+            c.drawCentredString(
+                cursor + pocket_w / 2,
+                center_y + center_h / 2 - 2,
+                f"FORE POCKET · {fore_pocket_m:.2f} m",
+            )
+            c.setFont("Helvetica-Bold", 5)
+            c.drawCentredString(
+                cursor + pocket_w / 2,
+                pocket_y + void_h / 2 - 2,
+                "VOID SPACE",
+            )
+            c.drawCentredString(
+                cursor + pocket_w / 2,
+                pocket_y + pocket_h - void_h / 2 - 2,
+                "VOID SPACE",
+            )
+            dim_y = y - 17
+            c.setStrokeColor(SLATE)
+            c.setFillColor(SLATE)
+            c.setLineWidth(0.55)
+            c.line(cursor + 2, dim_y, cursor + pocket_w - 2, dim_y)
+            c.line(cursor + 2, dim_y, cursor + 5, dim_y + 2)
+            c.line(cursor + 2, dim_y, cursor + 5, dim_y - 2)
+            c.line(cursor + pocket_w - 2, dim_y, cursor + pocket_w - 5, dim_y + 2)
+            c.line(cursor + pocket_w - 2, dim_y, cursor + pocket_w - 5, dim_y - 2)
+            c.setFont("Helvetica-Bold", 5.8)
+            c.drawCentredString(
+                cursor + pocket_w / 2,
+                dim_y + 3,
+                f"{fore_pocket_m:.2f} m",
+            )
 
         c.setFillColor(NAVY)
         c.setFont("Helvetica-Bold", 7)
-        c.drawString(x, y - 12, "AFT / STERN")
-        c.drawRightString(x + width, y - 12, "FORE / BOW")
+        c.drawString(x, y - 50, "AFT / STERN")
+        c.drawRightString(x + width, y - 50, "FORE / BOW")
         c.drawCentredString(x + width / 2, y + height + 25, "PORT")
-        c.drawCentredString(x + width / 2, y - 12, "STARBOARD")
+        c.drawCentredString(x + width / 2, y - 50, "STARBOARD")
 
     def cover_page(self):
         self.header("CARGO STOWAGE PLAN - LOADING CONDITION")
@@ -343,6 +424,7 @@ class StowagePdf:
             180,
             PAGE_W - 2 * MARGIN - 44,
             155,
+            ship.get("fore_pocket_m", 0),
         )
 
         c.setStrokeColor(LINE)

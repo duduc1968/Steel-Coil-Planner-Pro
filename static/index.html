@@ -90,7 +90,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF5 · LC1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · Loading Conditions Library 1</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF6 · LC1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · PDF Report 6 · LC Library 1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -142,7 +142,7 @@ async function getLoadingCondition(id){const db=await openVoyageDB();const recor
 async function listLoadingConditions(){const db=await openVoyageDB();const records=await new Promise((resolve,reject)=>{const tx=db.transaction(CONDITION_STORE,'readonly');const req=tx.objectStore(CONDITION_STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});db.close();return records.sort((a,b)=>Date.parse(b.updatedAt||0)-Date.parse(a.updatedAt||0))}
 async function removeLoadingCondition(id){const db=await openVoyageDB();await new Promise((resolve,reject)=>{const tx=db.transaction(CONDITION_STORE,'readwrite');tx.objectStore(CONDITION_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}
 function conditionId(){return crypto.randomUUID?crypto.randomUUID():'condition-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
-const defaultFleet=[{name:'Default coaster',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]},{name:'MV Drogdenbank',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]}];
+const defaultFleet=[{name:'Default coaster',holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]},{name:'MV Drogdenbank',forePocketLength:9,holds:[{name:'Hold 1',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15},{name:'Hold 2',length:48,width:11.5,depth:null,diameter:1.8,rowGap:.15}]}];
 let fleet=loadFleet(), activeShip=0, activeHold=0, allocations={}, cargoSource='list', bottomMode='auto', wedgeMode='auto';
 let selectedCoilKey = null;
 let workspaceMode='zones';
@@ -1427,11 +1427,11 @@ function stowagePdfPayload(){
   });
   const allCoils=holds.flatMap(h=>h.coils),allZones=holds.flatMap(h=>h.zones);
   return {
-    build:'Foundation 4.3 - PDF Report 5',
+    build:'Foundation 4.3 - PDF Report 6',
     generated_at:new Date().toISOString().replace('T',' ').slice(0,16)+' UTC',
     reference:activeConditionReference||cargoFileName||'Simulation Mode',
     cargo_description:'Steel coils',
-    ship:{name:vessel.name},
+    ship:{name:vessel.name,fore_pocket_m:n(vessel.forePocketLength,/drogdenbank/i.test(vessel.name)?9:0)},
     totals:{
       coils:allCoils.length,weight_t:allCoils.reduce((sum,item)=>sum+item.weight_t,0),
       zones:allZones.length,holds_used:holds.filter(h=>h.zones.length).length,

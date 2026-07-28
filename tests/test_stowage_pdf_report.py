@@ -91,7 +91,7 @@ def sample_payload():
         "generated_at": "2026-07-28 08:00 UTC",
         "reference": "TEST-VOYAGE",
         "cargo_description": "Steel coils",
-        "ship": {"name": "MV Test Vessel"},
+        "ship": {"name": "MV Test Vessel", "fore_pocket_m": 9},
         "totals": {
             "coils": 36,
             "weight_t": 360,
@@ -115,6 +115,8 @@ def test_pdf_is_a4_landscape_and_contains_expected_sections(tmp_path):
     assert "VALIDATED CARGO ZONES" not in text
     assert "COIL MANIFEST - VALIDATED LOADING CONDITION" not in text
     assert "COIL-SUITABLE SPACE" in text
+    assert "FORE POCKET" in text
+    assert "VOID SPACE" in text
     assert "MV Test Vessel" in text
     assert "Hold 1" in text and "Hold 2" in text
 
