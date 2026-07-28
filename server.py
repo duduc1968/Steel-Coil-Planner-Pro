@@ -9,6 +9,7 @@ from app.io.cargo_reader import read_cargo
 from app.core.planner import make_plan, summary
 from app.core.geometry import PATTERN_LABELS
 from app.reports.drawing import draw_plan
+from app.reports.stowage_pdf import build_stowage_pdf
 from app.reports.weight_report import block_weight_summary
 
 ROOT = Path(__file__).parent
@@ -161,6 +162,28 @@ async def import_cargo(cargo_file: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/export-stowage-pdf")
+async def export_stowage_pdf(payload: dict):
+    """Export the browser's validated loading condition without re-planning it."""
+    try:
+        job_id = uuid4().hex[:10]
+        job_results = RESULTS / f"stowage_{job_id}"
+        job_results.mkdir(parents=True, exist_ok=True)
+        ship_name = str((payload.get("ship") or {}).get("name") or "vessel")
+        safe_ship = ship_file_name(ship_name)
+        pdf_name = f"{safe_ship}_cargo_stowage_plan.pdf"
+        pdf_path = build_stowage_pdf(payload, job_results / pdf_name)
+        return FileResponse(
+            pdf_path,
+            media_type="application/pdf",
+            filename=pdf_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
 @app.post("/calculate")
 async def calculate(

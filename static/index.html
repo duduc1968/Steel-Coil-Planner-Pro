@@ -17,7 +17,7 @@
 
 .ship-distribution{background:#0f172a;color:#e8f0fb;border:1px solid #334155;border-radius:14px;padding:14px;margin-bottom:16px}.ship-distribution-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.ship-distribution-head b{font-size:13px;text-transform:uppercase;letter-spacing:.04em}.ship-distribution-head span{font-size:12px;color:#9fb1c8}.ship-silhouette{display:flex;gap:4px;align-items:stretch;height:76px;padding:7px 14px;border:2px solid #64748b;border-radius:42px;background:#111827;overflow:hidden}.ship-hold-segment{position:relative;min-width:50px;border:1px solid #64748b;background:#1f2937;overflow:hidden;display:flex;align-items:center;justify-content:center}.ship-hold-fill{position:absolute;top:0;bottom:0;background:linear-gradient(180deg,#2563eb,#1d4ed8);opacity:.82;border-right:1px solid rgba(255,255,255,.65)}.ship-hold-segment.active{outline:2px solid #60a5fa;outline-offset:1px}.ship-hold-label{position:relative;z-index:1;text-align:center;font-size:10px;font-weight:900;text-shadow:0 1px 2px #000}.ship-distribution-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:11px;color:#cbd5e1}.legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:-1px}.stowage-plan-stack{position:relative}.stowage-zone-strip-wrap{margin:0 10px 7px}.stowage-zone-strip-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;color:#64748b;font-size:9px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.stowage-zone-map{position:relative;width:100%;height:25px;border:1px solid #94a3b8;border-radius:6px;background:#e5e7eb;overflow:hidden}.stowage-zone-segment{position:absolute;top:0;bottom:0;background:rgba(37,99,235,.72);border:1px solid #1d4ed8;color:#fff;font-size:9px;font-weight:900;display:grid;place-items:center;white-space:nowrap;overflow:hidden}.plan-real{height:clamp(190px,24vw,285px);border:2px solid #64748b;background:linear-gradient(180deg,#f8fafc,#eef2f7);box-shadow:inset 0 0 0 5px #e2e8f0}.plan-real:before,.plan-real:after{position:absolute;left:50%;transform:translateX(-50%);z-index:6;color:#475569;font-size:9px;font-weight:900;letter-spacing:.08em;pointer-events:none}.plan-real:before{content:'PORT';top:5px}.plan-real:after{content:'STARBOARD';bottom:20px}.plan-real .rows{left:12px;right:12px;top:23px;bottom:35px;gap:2px}.plan-real .row{gap:1px}.plan-real .block{border-radius:3px;min-width:4px}.geometry-canvas{position:absolute;left:12px;right:12px;top:23px;bottom:35px;z-index:3}.geometry-coil{position:absolute;border:1px solid rgba(15,23,42,.45);border-radius:4px;display:grid;place-items:center;font-size:8px;font-weight:900;overflow:hidden;min-width:4px;min-height:5px;box-shadow:0 1px 2px rgba(15,23,42,.18)}.geometry-coil.bottom{z-index:2}.geometry-coil.upper{z-index:4;box-shadow:0 2px 4px rgba(15,23,42,.28)}.geometry-coil.wedge{z-index:5}.geometry-coil.coil-selected{outline:3px solid #f97316;outline-offset:1px}.plan-real .hold-axis{position:absolute;left:50%;top:19px;bottom:19px;border-left:1px dashed #94a3b8;z-index:1;pointer-events:none}.plan-real .fore-label,.plan-real .aft-label{position:absolute;top:50%;transform:translateY(-50%);z-index:6;color:#475569;font-size:9px;font-weight:900;writing-mode:vertical-rl;letter-spacing:.08em;pointer-events:none}.plan-real .fore-label{right:2px}.plan-real .aft-label{left:2px;transform:translateY(-50%) rotate(180deg)}.stowage-zone-segment.possible{background:rgba(22,163,74,.72);border-color:#15803d}.stowage-zone-segment.adjust{background:rgba(217,119,6,.76);border-color:#b45309}.stowage-zone-segment.impossible{background:rgba(220,38,38,.72)}.zone-sync-note{font-size:11px;color:#166534;font-weight:800;margin-top:7px}
 
-.workspace-tabs{display:flex;gap:8px;margin-top:10px}.workspace-tab{border:1px solid #94a3b8;background:#fff;color:#334155;border-radius:9px;padding:8px 12px;font-weight:900;cursor:pointer}.workspace-tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}.zone-intro{background:#eff6ff;border:1px solid #93c5fd;border-radius:12px;padding:12px 14px;margin-bottom:14px;color:#1e3a8a;font-size:13px;line-height:1.4}.zone-card{background:#fff;border:1px solid #cbd5e1;border-radius:14px;margin-bottom:18px;overflow:hidden}.zone-card.active{box-shadow:0 0 0 3px #60a5fa}.zone-hold{position:relative;width:calc(100% - 28px);height:auto;min-height:145px;max-height:285px;margin:14px;border:1px solid #94a3b8;border-radius:12px;background:repeating-linear-gradient(90deg,#f8fafc 0,#f8fafc calc(10% - 1px),#dbe4ef calc(10% - 1px),#dbe4ef 10%);overflow:hidden;user-select:none;touch-action:none}
+.workspace-tabs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.workspace-tab{border:1px solid #94a3b8;background:#fff;color:#334155;border-radius:9px;padding:8px 12px;font-weight:900;cursor:pointer}.workspace-tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}.workspace-tab.pdf-export{background:#166534;color:#fff;border-color:#15803d}.workspace-tab.pdf-export:disabled{opacity:.6;cursor:wait}.zone-intro{background:#eff6ff;border:1px solid #93c5fd;border-radius:12px;padding:12px 14px;margin-bottom:14px;color:#1e3a8a;font-size:13px;line-height:1.4}.zone-card{background:#fff;border:1px solid #cbd5e1;border-radius:14px;margin-bottom:18px;overflow:hidden}.zone-card.active{box-shadow:0 0 0 3px #60a5fa}.zone-hold{position:relative;width:calc(100% - 28px);height:auto;min-height:145px;max-height:285px;margin:14px;border:1px solid #94a3b8;border-radius:12px;background:repeating-linear-gradient(90deg,#f8fafc 0,#f8fafc calc(10% - 1px),#dbe4ef calc(10% - 1px),#dbe4ef 10%);overflow:hidden;user-select:none;touch-action:none}
 /* v9.4.0 — Professional Hold Visualization */
 .hold-boundary-wrap{position:relative;padding:26px 36px 30px}
 .hold-boundary-wrap .side-label{position:absolute;top:50%;font-size:10px;font-weight:900;letter-spacing:.08em;color:#334155;z-index:8}
@@ -81,7 +81,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Foundation 4.3 · PDF Report 1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -106,7 +106,7 @@
 <div class="hint" id="patternHint">Bottom can be Auto or Manual. Upper Port and Upper Starboard are controlled independently inside each Cargo Zone. Simulation Mode works without a cargo list.</div>
 <button class="btn green" id="buildBtn">Build / refresh workspace</button>
 </div></aside>
-<section class="workspace"><div class="ws-head"><div><h2 id="workspaceTitle">Cargo Allocation by Zone</h2><div class="workspace-tabs"><button id="zonesTab" class="workspace-tab active">Cargo Zones</button><button id="cargoPoolTab" class="workspace-tab">Cargo Pool</button><button id="stowageTab" class="workspace-tab">Stowage Workspace</button></div></div><span class="badge" id="statusBadge">Ready</span></div><div id="zoneWorkspace"></div><div id="cargoPoolWorkspace" style="display:none"></div><div id="holdsWorkspace" style="display:none"></div></section>
+<section class="workspace"><div class="ws-head"><div><h2 id="workspaceTitle">Cargo Allocation by Zone</h2><div class="workspace-tabs"><button id="zonesTab" class="workspace-tab active">Cargo Zones</button><button id="cargoPoolTab" class="workspace-tab">Cargo Pool</button><button id="stowageTab" class="workspace-tab">Stowage Workspace</button><button id="pdfPlanBtn" class="workspace-tab pdf-export">Download Stowage Plan PDF</button></div></div><span class="badge" id="statusBadge">Ready</span></div><div id="zoneWorkspace"></div><div id="cargoPoolWorkspace" style="display:none"></div><div id="holdsWorkspace" style="display:none"></div></section>
 <aside class="panel"><div class="pt">Voyage Summary</div><div class="pb" id="summaryBox"></div><div class="pt">Cargo Manager</div><div class="pb" id="cargoManager"><div class="hint">Import cargo or use Simulation Mode.</div></div><div class="pt">Coil Inspector</div><div class="pb" id="coilInspector"><div class="hint">Select a coil from the list, Top View, or Cross Section.</div></div><div class="pt">Cargo Preview</div><div class="pb" id="cargoPreview"><div class="hint">Import cargo or use Simulation Mode.</div></div></aside>
 </main>
 <div class="modalOverlay" id="fleetModal"><div class="modal"><div class="modalHead"><h2>Fleet Library</h2><button class="close" id="closeFleet">Close</button></div><div class="modalBody"><div><div class="pt">Saved ships</div><div id="shipList"></div><button class="btn" id="newShip">New ship</button></div><div><label>Ship name</label><input id="libShipName"><label>Hold selector</label><select id="libHoldSel"></select><div class="formgrid"><div><label>Hold name</label><input id="libHoldName"></div><div><label>Length m</label><input id="libLength" type="number" step="0.01"></div><div><label>Width m</label><input id="libWidth" type="number" step="0.01"></div><div><label>Depth m</label><input id="libDepth" type="number" step="0.01"></div><div><label>Default diameter m</label><input id="libDiam" type="number" step="0.01"></div><div><label>Row gap m</label><input id="libGap" type="number" step="0.01"></div></div><div class="actions"><button class="btn" id="saveShip">Save ship</button><button class="btn dark" id="addHold">Add hold</button><button class="btn red" id="deleteHold">Delete hold</button><button class="btn red" id="deleteShip">Delete ship</button></div><div class="hint" id="fleetStatus"></div></div></div></div></div>
@@ -1330,6 +1330,80 @@ function stowageManifest(skipPoolStatus=false){
   });
   return out;
 }
+function stowagePdfPayload(){
+  const vessel=ship();
+  const validated=[];
+  for(const h of vessel.holds)for(const z of optimizedZonesForHold(h))validated.push({h,z});
+  if(!validated.length)return null;
+  const validatedIds=new Set(validated.map(entry=>entry.z.id));
+  const manifest=stowageManifest(true).filter(item=>validatedIds.has(item.zoneId));
+  const holds=vessel.holds.map(h=>{
+    const zones=optimizedZonesForHold(h).map(z=>{
+      const p=(z.result&&z.result.pattern)||patternForZone(h,z);
+      const range=stowageZoneRange(h,z);
+      const zoneItems=manifest.filter(item=>item.zoneId===z.id);
+      return {
+        id:z.id,name:z.name||zoneLabel(h,z),label:zoneLabel(h,z),
+        start_m:range.start,end_m:range.end,used_length_m:range.length,
+        coil_count:zoneItems.length,weight_t:zoneItems.reduce((sum,item)=>sum+n(item.weight,0),0),
+        row_sizes:Array.isArray(z.result.rowSizes)?z.result.rowSizes:[],
+        cargo_type:z.cargoType||'Steel coils',planning_mode:z.planningMode,
+        tolerance_t:n(z.tolerance,0),bottom:`${i(p.port,0)} + ${i(p.stbd,0)}`,
+        upper:`${i(z.upperPort,0)} / ${i(z.upperStbd,0)}`,wedge:i(p.wedge,0),
+        notes:z.notes||'',validated_at:z.validatedAt||'',pattern:clonePlanningValue(p)
+      };
+    });
+    const coils=manifest.filter(item=>item.hold===h.name).map(item=>({
+      id:String(item.id),hold:item.hold,zone:item.zoneName||zoneLabel(h,findZone(item.zoneId)),
+      zone_id:item.zoneId,row:i(item.holdBlock||item.block,0),position:item.positionId,
+      tier:item.type||item.tier,weight_t:n(item.weight,0),diameter_m:n(item.diameter,0),
+      width_m:n(item.width,0),block_start_m:n(item.blockStart,0),
+      block_width_m:n(item.blockWidth,item.width),transverse_x_m:n(item.x,0),
+      vertical_y_m:n(item.y,0)
+    }));
+    return {name:h.name,length_m:n(h.length,0),width_m:n(h.width,0),zones,coils};
+  }).filter(h=>h.zones.length);
+  const allCoils=holds.flatMap(h=>h.coils),allZones=holds.flatMap(h=>h.zones);
+  return {
+    build:'Foundation 4.3 - PDF Report 1',
+    generated_at:new Date().toISOString().replace('T',' ').slice(0,16)+' UTC',
+    reference:cargoFileName||'Simulation Mode',
+    cargo_description:'Steel coils',
+    ship:{name:vessel.name},
+    totals:{
+      coils:allCoils.length,weight_t:allCoils.reduce((sum,item)=>sum+item.weight_t,0),
+      zones:allZones.length,holds_used:holds.length,
+      occupied_length_m:holds.reduce((sum,h)=>sum+stowageDimensionData(vessel.holds.find(x=>x.name===h.name)).occupied,0)
+    },
+    holds
+  };
+}
+async function downloadStowagePdf(){
+  const payload=stowagePdfPayload();
+  if(!payload){alert('Validate at least one cargo zone before creating the PDF.');return}
+  pdfPlanBtn.disabled=true;
+  const oldText=pdfPlanBtn.textContent;
+  pdfPlanBtn.textContent='Creating PDF...';
+  statusBadge.textContent='Creating printable A3 stowage plan';
+  try{
+    const response=await fetch('/api/export-stowage-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!response.ok){let message='PDF generation failed';try{const data=await response.json();message=data.detail||message}catch(e){}throw new Error(message)}
+    const blob=await response.blob();
+    const disposition=response.headers.get('content-disposition')||'';
+    const match=disposition.match(/filename="?([^";]+)"?/i);
+    const filename=match?match[1]:`${String(ship().name||'vessel').replace(/[^a-z0-9_-]+/gi,'_')}_cargo_stowage_plan.pdf`;
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    statusBadge.textContent='Printable stowage plan downloaded';
+  }catch(error){
+    statusBadge.textContent='PDF export failed';
+    alert(error.message);
+  }finally{
+    pdfPlanBtn.disabled=false;
+    pdfPlanBtn.textContent=oldText;
+  }
+}
 function selectCoil(key){selectedCoilKey=key;const item=stowageManifest().find(x=>x.key===key);if(item){activeHold=item.holdIndex;renderSelectors()}renderWorkspace()}
 function renderCargoManager(){
   const items=stowageManifest();
@@ -1395,7 +1469,7 @@ document.addEventListener('keydown',e=>{
   const optimize=document.querySelector(`button[data-optimize="${selectedZoneId}"]`);
   if(optimize){e.preventDefault();optimize.click();}
 });
-zonesTab.onclick=()=>setWorkspaceMode('zones');cargoPoolTab.onclick=()=>setWorkspaceMode('pool');stowageTab.onclick=()=>setWorkspaceMode('stowage');
+zonesTab.onclick=()=>setWorkspaceMode('zones');cargoPoolTab.onclick=()=>setWorkspaceMode('pool');stowageTab.onclick=()=>setWorkspaceMode('stowage');pdfPlanBtn.onclick=downloadStowagePdf;
 async function bootApplication(){
   const restored=await restoreVoyageFromDatabase();
   renderSelectors();restoreSessionUI();setCargoMode();setBottomMode();setWedgeMode();initAllocations();
