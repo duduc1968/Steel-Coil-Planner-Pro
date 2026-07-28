@@ -182,10 +182,10 @@ class StowagePdf:
             key=lambda h: int("".join(ch for ch in _text(h.get("name")) if ch.isdigit()) or 0),
             reverse=True,
         )
-        stern_w = width * 0.12
         bow_w = width * 0.12
-        cargo_x = x + stern_w
-        cargo_w = width - stern_w - bow_w
+        end_margin = width * 0.055
+        cargo_x = x + end_margin
+        cargo_w = width - 2 * end_margin
         total_length = sum(max(0.01, _number(h.get("length_m"), 1)) for h in ordered)
 
         hull = c.beginPath()
@@ -214,14 +214,6 @@ class StowagePdf:
         c.setLineWidth(2)
         c.drawPath(hull, fill=1, stroke=1)
 
-        # A simple superstructure cue makes the plan read as one real vessel.
-        c.setFillColor(colors.white)
-        c.setStrokeColor(NAVY)
-        c.rect(x + 12, y + 20, stern_w - 20, height - 40, fill=1, stroke=1)
-        c.setFillColor(NAVY)
-        c.setFont("Helvetica-Bold", 6)
-        c.drawCentredString(x + stern_w / 2, y + height / 2 - 2, "AFT")
-
         cursor = cargo_x
         gap = 5
         usable = cargo_w - gap * max(0, len(ordered) - 1)
@@ -230,23 +222,6 @@ class StowagePdf:
             hw = usable * hold_length / total_length
             inner_y = y + 33
             inner_h = height - 51
-            # Compartment outline. Hold 1 has the sloped forward end seen in the
-            # vessel's cargo-plan scheme; the rectangular inset is the saved
-            # coil-suitable space used by the planner.
-            compartment = c.beginPath()
-            compartment.moveTo(cursor - 3, inner_y - 5)
-            compartment.lineTo(cursor - 3, inner_y + inner_h + 5)
-            if int("".join(ch for ch in _text(hold.get("name")) if ch.isdigit()) or 0) == 1:
-                compartment.lineTo(cursor + hw + 3, inner_y + inner_h - 4)
-                compartment.lineTo(cursor + hw + 3, inner_y + 4)
-            else:
-                compartment.lineTo(cursor + hw + 3, inner_y + inner_h + 5)
-                compartment.lineTo(cursor + hw + 3, inner_y - 5)
-            compartment.close()
-            c.setFillColor(colors.HexColor("#e2e8f0"))
-            c.setStrokeColor(NAVY)
-            c.setLineWidth(1)
-            c.drawPath(compartment, fill=1, stroke=1)
             c.setFillColor(colors.white)
             c.setStrokeColor(NAVY)
             c.setLineWidth(1.2)
@@ -325,16 +300,8 @@ class StowagePdf:
         c.setFont("Helvetica-Bold", 7)
         c.drawString(x, y - 12, "AFT / STERN")
         c.drawRightString(x + width, y - 12, "FORE / BOW")
-        c.saveState()
-        c.translate(x - 8, y + height / 2)
-        c.rotate(90)
-        c.drawCentredString(0, 0, "PORT")
-        c.restoreState()
-        c.saveState()
-        c.translate(x + width + 8, y + height / 2)
-        c.rotate(-90)
-        c.drawCentredString(0, 0, "STARBOARD")
-        c.restoreState()
+        c.drawCentredString(x + width * 0.25, y + height + 25, "PORT")
+        c.drawCentredString(x + width * 0.75, y + height + 25, "STARBOARD")
 
     def cover_page(self):
         self.header("CARGO STOWAGE PLAN - LOADING CONDITION")
