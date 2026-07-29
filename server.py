@@ -4,7 +4,6 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from starlette.concurrency import run_in_threadpool
 
 from app.io.cargo_reader import read_cargo
 from app.io.cargo_converter import convert_cargo_list
@@ -179,7 +178,9 @@ async def cargo_converter_preview(cargo_file: UploadFile = File(...)):
         job_id = uuid4().hex[:10]
         upload_path = UPLOADS / f"converter_{job_id}{suffix}"
         upload_path.write_bytes(await cargo_file.read())
-        converted = await run_in_threadpool(convert_cargo_list, upload_path)
+        # tesserocr/cysignals must run on Python's main interpreter thread.
+        # Excel and CSV are light enough to share this direct conversion path.
+        converted = convert_cargo_list(upload_path)
         return converted | {"filename": cargo_file.filename}
     except HTTPException:
         raise
