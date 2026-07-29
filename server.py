@@ -4,6 +4,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from app.io.cargo_reader import read_cargo
 from app.io.cargo_converter import convert_cargo_list
@@ -173,12 +174,13 @@ async def cargo_converter_preview(cargo_file: UploadFile = File(...)):
         if suffix not in [".csv", ".xlsx", ".xls", ".pdf"]:
             raise HTTPException(
                 status_code=400,
-                detail="Converter v1 accepts XLSX, XLS, CSV, or a PDF for compatibility review.",
+                detail="Converter accepts XLSX, XLS, CSV, or PDF files.",
             )
         job_id = uuid4().hex[:10]
         upload_path = UPLOADS / f"converter_{job_id}{suffix}"
         upload_path.write_bytes(await cargo_file.read())
-        return convert_cargo_list(upload_path) | {"filename": cargo_file.filename}
+        converted = await run_in_threadpool(convert_cargo_list, upload_path)
+        return converted | {"filename": cargo_file.filename}
     except HTTPException:
         raise
     except Exception as exc:

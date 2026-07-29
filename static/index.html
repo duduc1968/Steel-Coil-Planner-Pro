@@ -82,11 +82,11 @@
 .condition-meta{border:1px solid #334155;background:#111827;border-radius:12px;padding:12px;margin-top:12px;line-height:1.6}
 .condition-meta b{color:#93c5fd}
 .condition-empty{color:#9fb1c8;text-align:center;padding:30px 10px}
-.converter-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+.converter-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:12px}
 .converter-summary .stat span{font-size:18px}
 .converter-sheet{display:flex;justify-content:space-between;gap:12px;border:1px solid #334155;border-radius:10px;background:#111827;padding:10px;margin-top:8px}
 .converter-sheet b{display:block}.converter-sheet span{font-size:11px;color:#9fb1c8}
-.converter-sheet .included{color:#22c55e}.converter-sheet .excluded{color:#fbbf24}.converter-sheet .ignored{color:#94a3b8}
+.converter-sheet .included{color:#22c55e}.converter-sheet .excluded,.converter-sheet .separated{color:#fbbf24}.converter-sheet .ignored,.converter-sheet .not_found{color:#94a3b8}
 .converter-warning{border:1px solid #92400e;background:#451a03;color:#fde68a;border-radius:10px;padding:9px;margin-top:8px;font-size:12px}
 .converter-preview-table{max-height:310px;overflow:auto;border:1px solid #334155;border-radius:10px;margin-top:12px}
 .converter-preview-table table{margin:0}.converter-preview-table thead th{position:sticky;top:0;background:#162033}
@@ -99,7 +99,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF7 · LC1 · CV1.1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Stable engines F4.3 · Cargo Converter 1.1</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF7 · LC1 · CV2</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Stable engines F4.3 · OCR Cargo Converter 2</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -1504,8 +1504,11 @@ let pendingConvertedCargo=null;
 function renderConverterPreview(data){
  const sheets=(data.sheets||[]).map(s=>`<div class="converter-sheet"><div><b>${escapeHtml(s.name)}</b><span>${escapeHtml(s.reason||'')}</span></div><div class="${escapeHtml(s.action)}"><b>${escapeHtml(String(s.action||'').toUpperCase())}</b><span>${Number(s.rows_found||0)} rows</span></div></div>`).join('');
  const warnings=(data.warnings||[]).map(w=>`<div class="converter-warning">${escapeHtml(w)}</div>`).join('');
- const rows=(data.coils||[]).slice(0,25).map(r=>`<tr><td>${escapeHtml(r.ID)}</td><td>${Number(r.Weight_t).toFixed(3)}</td><td>${Number(r.Width_m).toFixed(3)}</td><td>${escapeHtml(r.Source_sheet||'')}</td></tr>`).join('');
- cargoConverterResult.innerHTML=`<div class="converter-summary"><div class="stat"><b>Loadable coils</b><span>${Number(data.coil_count||0)}</span></div><div class="stat"><b>Total weight</b><span>${Number(data.total_weight_t||0).toFixed(3)} t</span></div><div class="stat"><b>Status</b><span class="${(data.warnings||[]).length?'warn':'ok'}">${(data.warnings||[]).length?'REVIEW':'READY'}</span></div></div><b>Source decisions</b>${sheets}${warnings}<div class="converter-preview-table"><table><thead><tr><th>ID</th><th>Weight t</th><th>Width m</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div><span class="cargo-preview-count">Showing first ${Math.min(25,Number(data.coil_count||0))} of ${Number(data.coil_count||0)} extracted coils. IDs remain text.</span>`;
+ const rows=(data.coils||[]).slice(0,25).map(r=>`<tr><td>${escapeHtml(r.ID)}</td><td>${Number(r.Weight_t).toFixed(3)}</td><td>${Number(r.Width_m).toFixed(3)}</td><td>${escapeHtml(r.Source_sheet||('Page '+(r.Source_page||'')))}</td></tr>`).join('');
+ const plates=data.products?.plates||[];const plateRows=plates.slice(0,20).map(r=>`<tr><td>${escapeHtml(r.ID)}</td><td>${Number(r.Quantity||1)}</td><td>${Number(r.Weight_t).toFixed(3)}</td><td>${Number(r.Width_m).toFixed(3)}</td><td>${Number(r.Length_m).toFixed(3)}</td><td>Page ${Number(r.Source_page||0)}</td></tr>`).join('');
+ const rec=data.reconciliation||{};const translated=data.translations&&Object.keys(data.translations).length?`<div class="hint"><b>Translated:</b> Artikel → Product · Pall id ext → Cargo ID · Antal → Quantity · Bredd → Width · Längd → Length · Vikt → Weight</div>`:'';
+ acceptConvertedCargo.disabled=Number(data.coil_count||0)===0;acceptConvertedCargo.textContent=Number(data.coil_count||0)?`Accept ${Number(data.coil_count)} coils into Cargo Pool`:'No coils available for Cargo Pool';
+ cargoConverterResult.innerHTML=`<div class="converter-summary"><div class="stat"><b>Coils</b><span>${Number(data.product_counts?.coils??data.coil_count??0)}</span></div><div class="stat"><b>Plates separated</b><span>${Number(data.product_counts?.plates||0)}</span></div><div class="stat"><b>Coil weight</b><span>${Number(data.total_weight_t||0).toFixed(3)} t</span></div><div class="stat"><b>Weight totals</b><span>${rec.groups_checked!=null?Number(rec.weight_groups_matched??rec.groups_matched??0)+' / '+Number(rec.groups_checked||0):'—'}</span></div><div class="stat"><b>Status</b><span class="${(data.warnings||[]).length?'warn':'ok'}">${(data.warnings||[]).length?'REVIEW':'READY'}</span></div></div>${translated}<b>Source decisions</b>${sheets}${warnings}<h3>COILS · eligible for Cargo Pool</h3><div class="converter-preview-table"><table><thead><tr><th>ID</th><th>Weight t</th><th>Width m</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div><span class="cargo-preview-count">Showing first ${Math.min(25,Number(data.coil_count||0))} of ${Number(data.coil_count||0)} extracted coils. IDs remain text.</span>${plates.length?`<h3>PLATES · separated from Coil Cargo Pool</h3><div class="converter-preview-table"><table><thead><tr><th>ID</th><th>Qty</th><th>Weight t</th><th>Width m</th><th>Length m</th><th>Source</th></tr></thead><tbody>${plateRows}</tbody></table></div><span class="cargo-preview-count">Showing first ${Math.min(20,plates.length)} of ${plates.length} plate entries.</span>`:''}`;
 }
 async function importCargo(){
  const f=cargoFile.files[0];if(!f){alert('Choose cargo file first');return}

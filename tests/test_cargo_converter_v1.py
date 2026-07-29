@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.io.cargo_converter import convert_cargo_list
+from app.io.cargo_converter import _parse_ocr_pages, convert_cargo_list
 
 
 def test_excel_excludes_not_to_load_sheet_and_preserves_text_ids(tmp_path: Path):
@@ -47,12 +47,27 @@ def test_csv_normalizes_kg_and_mm(tmp_path: Path):
 
 
 def test_scanned_pdf_is_not_silently_accepted(tmp_path: Path):
-    path = tmp_path / "cargo.pdf"
-    path.write_bytes(b"%PDF-1.4")
+    result = _parse_ocr_pages(
+        [
+            """
+            LASTNINGSLISTA
+            LON: 4 Artikel: COILS Finns pa forradsplats: COILSH.P01R01
+            Pall id ext Antal Bredd Langd Vikt
+            CMT001 l 1103 18250
+            CMT002 1 1225 20000
+            Antal pallar 2 Summa vikt 38250
+            LON: 4 Artikel: PLATES Finns pa forradsplats: PLATES.P02R01
+            Pall id ext Antal Bredd Langd Vikt
+            PLT001 4 2500 12000 48000
+            Antal pallar 4 Summa vikt 48000
+            """
+        ],
+        "mixed.pdf",
+    ).as_dict()
 
-    try:
-        convert_cargo_list(path)
-    except ValueError as exc:
-        assert "OCR" in str(exc)
-    else:
-        raise AssertionError("Scanned PDF must require OCR review in Converter v1.")
+    assert result["product_counts"] == {"coils": 2, "plates": 1, "unknown": 0}
+    assert result["coil_count"] == 2
+    assert result["total_weight_t"] == 38.25
+    assert result["products"]["plates"][0]["Length_m"] == 12
+    assert result["products"]["plates"][0]["Quantity"] == 4
+    assert result["reconciliation"]["groups_matched"] == 2

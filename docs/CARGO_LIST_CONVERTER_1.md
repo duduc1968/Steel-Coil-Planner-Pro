@@ -50,3 +50,27 @@ mandatory review state are reserved for Converter v2.
   filters, pending converter preview, and restored-session runtime flag.
 - An empty Cargo List can no longer reuse the previous Simulation quantity.
 - Accepting a converted list redraws Cargo Pool immediately.
+
+## Converter v2 scanned PDF and mixed cargo
+
+- Scanned pages are rendered and processed by OCR.
+- Swedish loading-list headings are mapped to English planning fields.
+- Product classification is controlled by the explicit `Artikel` field.
+- `Artikel: COILS` rows become candidates for Coil Cargo Pool.
+- `Artikel: PLATES` rows are separated with quantity, width, length, and weight.
+- The word `Antal plåtar` in a summary does not by itself classify a block as
+  plate cargo.
+- Extracted group weights are reconciled against every printed `Summa vikt`.
+- OCR output remains a review preview until the user explicitly accepts coils.
+
+### Verified CCF_000488 PDF
+
+- Source is a scanned PDF without a selectable text layer.
+- Uploaded subset contains original document pages 6 through 16.
+- Every explicit product header is `Artikel: COILS`.
+- 191 coils extracted.
+- 3,175.105 t extracted coil weight.
+- 0 plate entries in this uploaded subset.
+- 38 of 38 printed group-weight totals reconcile exactly.
+- One printed pallet-count field is read ambiguously by OCR, while that group's
+  weight total still reconciles.
