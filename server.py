@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.io.cargo_reader import read_cargo
+from app.io.cargo_converter import convert_cargo_list
 from app.core.planner import make_plan, summary
 from app.core.geometry import PATTERN_LABELS
 from app.reports.drawing import draw_plan
@@ -162,6 +163,26 @@ async def import_cargo(cargo_file: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/cargo-converter/preview")
+async def cargo_converter_preview(cargo_file: UploadFile = File(...)):
+    """Extract and validate a cargo list without changing the planning state."""
+    try:
+        suffix = Path(cargo_file.filename).suffix.lower()
+        if suffix not in [".csv", ".xlsx", ".xls", ".pdf"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Converter v1 accepts XLSX, XLS, CSV, or a PDF for compatibility review.",
+            )
+        job_id = uuid4().hex[:10]
+        upload_path = UPLOADS / f"converter_{job_id}{suffix}"
+        upload_path.write_bytes(await cargo_file.read())
+        return convert_cargo_list(upload_path) | {"filename": cargo_file.filename}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/api/export-stowage-pdf")

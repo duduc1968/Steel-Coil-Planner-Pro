@@ -99,7 +99,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF7 · LC1 · CV1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Stable engines F4.3 · Cargo Converter 1</div></header>
+<header class="top"><div class="brand"><div class="logo">SCP</div><div><h1>Steel Coil Planner Pro <span style="font-size:12px;color:#93c5fd">v10.1.0.4 · F4.3 · PDF7 · LC1 · CV1.1</span></h1><span>Progressive Cargo Planning · Professional Hold Visualization</span></div></div><div class="ver">Stable engines F4.3 · Cargo Converter 1.1</div></header>
 <main class="app">
 <aside class="panel"><div class="pt">Cargo Planning Setup <span id="fileState" class="small">No file</span></div><div class="pb">
 <label>Ship</label><select id="shipSelect"></select>
@@ -294,7 +294,9 @@ async function startNewVoyage(){
  if(!confirm('Start a new voyage? Ship Library and hold dimensions will be kept. Cargo list, zones, reservations and stowage plan will be cleared.'))return;
  // Stop a delayed save from restoring the voyage that is being deleted.
  clearTimeout(sessionSaveTimer);sessionSaveTimer=null;
+ restoredSession=null;pendingConvertedCargo=null;
  allocations={};cargoZones={};selectedZoneId=null;selectedZoneByHold={};selectedCoilKey=null;cargoFileName='';activeConditionReference='';cargoSource='list';
+ cargoSearch='';cargoPoolSearch='';cargoPoolFilter='all';
  cargo={coils:0,totalWeight:0,avgWeight:20,avgWidth:1.2,avgDiameter:null,rows:[]};
  localStorage.removeItem('scp_cargo_zones_v821');localStorage.removeItem('scp_selected_zone_v9');localStorage.removeItem(CARGO_ZONES_STATE_KEY);localStorage.removeItem(SESSION_KEY);localStorage.removeItem(LEGACY_SESSION_KEY);
  await deleteVoyageSnapshot();
@@ -303,7 +305,7 @@ async function startNewVoyage(){
  cargoPreview.innerHTML='<div class="hint">Import cargo or use Simulation Mode.</div>';
  cargoManager.innerHTML='<div class="hint">Import cargo or use Simulation Mode.</div>';
  coilInspector.innerHTML='<div class="hint">Select a coil from the list, Top View, or Cross Section.</div>';
- statusBadge.textContent='New voyage';renderSelectors();setCargoMode();build();
+ statusBadge.textContent='New voyage';renderSelectors();setCargoMode();build();renderCargoPool();
  // Persist only the clean voyage state, after all old stores have been deleted.
  try{localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()))}catch(e){console.warn('Clean voyage metadata save failed',e)}
  await writeVoyageSnapshot(voyageSnapshot());
@@ -1252,7 +1254,8 @@ function sectionSvg(p,zoneLabelText=''){
 
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function cargoRows(){
-  if(cargoSource==='list' && cargo.rows && cargo.rows.length){
+  if(cargoSource==='list'){
+    if(!Array.isArray(cargo.rows)||!cargo.rows.length)return [];
     return cargo.rows.map((c,idx)=>({sourceIndex:idx+1,id:String(c.ID||c.Coil_ID||('COIL-'+String(idx+1).padStart(3,'0'))),weight:Number(c.Weight_t||c.weight_t||cargo.avgWeight||avgT()),width:Number(c.Width_m||c.width_m||avgW()),diameter:c.Diameter_m?Number(c.Diameter_m):dia(),grade:c.Grade||c.Steel_Grade||c.grade||''}));
   }
   const count=Math.max(0,i(simCoils.value,cargo.coils||0));
@@ -1522,7 +1525,7 @@ async function useConvertedCargo(){
  avgWeight.value=cargo.avgWeight.toFixed(2);avgWidth.value=cargo.avgWidth.toFixed(2);
  if(cargo.avgDiameter){avgDiameter.value=cargo.avgDiameter.toFixed(3);diaHint.textContent='Diameter source: cargo list average '+cargo.avgDiameter.toFixed(3)+' m.'}else diaHint.textContent='No Diameter column found. Enter average diameter manually.';
  cargo.rows=data.coils||[];for(const h of ship().holds){for(const z of zonesForHold(h)){z.reservedCoilIds=[];z.optimization=null;z.result=null;}}
- saveCargoZones();renderCargoPreview(false);statusBadge.textContent='Converted cargo accepted';allocations={};cargoConverterModal.style.display='none';pendingConvertedCargo=null;saveSessionNow();await writeVoyageSnapshot(voyageSnapshot());build();
+ saveCargoZones();renderCargoPreview(false);statusBadge.textContent='Converted cargo accepted';allocations={};cargoConverterModal.style.display='none';pendingConvertedCargo=null;saveSessionNow();await writeVoyageSnapshot(voyageSnapshot());build();renderCargoPool();
 }
 closeCargoConverter.onclick=cancelConvertedCargo.onclick=()=>{cargoConverterModal.style.display='none';pendingConvertedCargo=null;fileState.textContent=cargoFileName||'No file'};
 acceptConvertedCargo.onclick=useConvertedCargo;

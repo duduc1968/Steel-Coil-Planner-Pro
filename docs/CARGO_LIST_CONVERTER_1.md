@@ -43,3 +43,10 @@ Closing or cancelling the preview leaves the active planning state unchanged.
 `CCF_000488.pdf` has no selectable text layer. Converter v1 refuses to silently
 accept it. OCR extraction, reconciliation against printed group totals, and a
 mandatory review state are reserved for Converter v2.
+
+## Converter v1.1 reset correction
+
+- **Start New Voyage** clears the cargo rows, Cargo Pool display, searches,
+  filters, pending converter preview, and restored-session runtime flag.
+- An empty Cargo List can no longer reuse the previous Simulation quantity.
+- Accepting a converted list redraws Cargo Pool immediately.
