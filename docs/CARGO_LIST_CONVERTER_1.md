@@ -74,3 +74,12 @@ mandatory review state are reserved for Converter v2.
 - 38 of 38 printed group-weight totals reconcile exactly.
 - One printed pallet-count field is read ambiguously by OCR, while that group's
   weight total still reconciles.
+
+## Converter v2.1 Render-native OCR
+
+- Keeps the existing Render Python service configuration.
+- Uses Tesseract when its executable is available.
+- Automatically falls back to bundled RapidOCR/ONNX when Tesseract is absent.
+- Does not require rebuilding the existing service as a Docker service.
+- The Render-native fallback was verified against the full uploaded scan:
+  191 coils, 3,175.105 t, and 38/38 matching printed weight totals.

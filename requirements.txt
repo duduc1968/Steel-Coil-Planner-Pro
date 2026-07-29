@@ -8,3 +8,4 @@ jinja2
 
 pdfplumber
 reportlab
+rapidocr_onnxruntime==1.4.4

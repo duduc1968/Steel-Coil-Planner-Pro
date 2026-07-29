@@ -273,12 +273,9 @@ PRODUCT_ALIASES = {
 
 
 def _ocr_pdf_pages(path: Path) -> list[str]:
-    missing = [cmd for cmd in ("pdftoppm", "tesseract") if not shutil.which(cmd)]
-    if missing:
+    if not shutil.which("pdftoppm"):
         raise ValueError(
-            "PDF OCR is not available on this deployment. Missing system component(s): "
-            + ", ".join(missing)
-            + ". Deploy Converter v2 with its Docker configuration."
+            "PDF OCR is not available because PDF rendering is missing on this deployment."
         )
 
     with tempfile.TemporaryDirectory(prefix="scp_ocr_") as temp:
@@ -302,7 +299,7 @@ def _ocr_pdf_pages(path: Path) -> list[str]:
         if not images:
             raise ValueError("The PDF did not contain any renderable pages.")
 
-        def recognize(image: Path) -> str:
+        def recognize_tesseract(image: Path) -> str:
             completed = subprocess.run(
                 ["tesseract", str(image), "stdout", "-l", "eng", "--psm", "6"],
                 capture_output=True,
@@ -313,9 +310,72 @@ def _ocr_pdf_pages(path: Path) -> list[str]:
                 raise ValueError(f"OCR failed on {image.name}.")
             return completed.stdout
 
-        # Two OCR workers keep memory use within Render's smaller instances.
-        with ThreadPoolExecutor(max_workers=min(2, len(images))) as pool:
-            return list(pool.map(recognize, images))
+        if shutil.which("tesseract"):
+            # Two OCR workers keep memory use within Render's smaller instances.
+            with ThreadPoolExecutor(max_workers=min(2, len(images))) as pool:
+                return list(pool.map(recognize_tesseract, images))
+
+        # Native Render services do not include the Tesseract executable.
+        # RapidOCR ships its own ONNX models and needs no system OCR package.
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+        except ImportError as exc:
+            raise ValueError(
+                "PDF OCR engine is unavailable. Rebuild the service with "
+                "rapidocr_onnxruntime from requirements.txt."
+            ) from exc
+
+        engine = RapidOCR()
+        pages = []
+        for image in images:
+            result, _ = engine(str(image))
+            pages.append(_rapidocr_result_to_text(result or []))
+        return pages
+
+
+def _rapidocr_result_to_text(result: list) -> str:
+    """Rebuild table lines from RapidOCR's positioned word boxes."""
+    words = []
+    for item in result:
+        if not item or len(item) < 2:
+            continue
+        box, value = item[0], str(item[1]).strip()
+        if not value or not box:
+            continue
+        left = min(float(point[0]) for point in box)
+        ys = [float(point[1]) for point in box]
+        centre_y = sum(ys) / len(ys)
+        height = max(ys) - min(ys)
+        words.append((centre_y, left, height, value))
+    words.sort()
+
+    lines: list[dict] = []
+    for centre_y, left, height, value in words:
+        chosen = None
+        for line in reversed(lines[-4:]):
+            tolerance = max(8.0, (height + line["height"]) * 0.35)
+            if abs(centre_y - line["centre_y"]) <= tolerance:
+                chosen = line
+                break
+        if chosen is None:
+            lines.append(
+                {
+                    "centre_y": centre_y,
+                    "height": height,
+                    "words": [(left, value)],
+                }
+            )
+        else:
+            chosen["words"].append((left, value))
+            count = len(chosen["words"])
+            chosen["centre_y"] = (
+                chosen["centre_y"] * (count - 1) + centre_y
+            ) / count
+            chosen["height"] = max(chosen["height"], height)
+    return "\n".join(
+        " ".join(value for _, value in sorted(line["words"]))
+        for line in lines
+    )
 
 
 def _normalized_product(raw: str) -> str:
@@ -377,7 +437,7 @@ def _parse_ocr_pages(pages: list[str], filename: str) -> ConversionResult:
         re.IGNORECASE,
     )
     total_pattern = re.compile(
-        r"ANTAL\s+PALLAR\s+(\d+).*?SUMMA\s+VIKT\s+(\d+)",
+        r"ANTAL\s*PALLAR\s+(\d+).*?SUMMA\s*VIKT\s+(\d+)",
         re.IGNORECASE,
     )
     row_pattern = re.compile(r"^\s*([A-Z0-9][A-Z0-9.-]{2,24})\s+(.+?)\s*$", re.IGNORECASE)
