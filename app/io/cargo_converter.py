@@ -316,66 +316,30 @@ def _ocr_pdf_pages(path: Path) -> list[str]:
                 return list(pool.map(recognize_tesseract, images))
 
         # Native Render services do not include the Tesseract executable.
-        # RapidOCR ships its own ONNX models and needs no system OCR package.
+        # The tesserocr wheel bundles the native library and is far lighter
+        # than ONNX-based OCR on a memory-limited free instance.
         try:
-            from rapidocr_onnxruntime import RapidOCR
+            import tessdata
+            import tesserocr
+            from PIL import Image
         except ImportError as exc:
             raise ValueError(
                 "PDF OCR engine is unavailable. Rebuild the service with "
-                "rapidocr_onnxruntime from requirements.txt."
+                "tesserocr and tessdata.fast-eng from requirements.txt."
             ) from exc
 
-        engine = RapidOCR()
         pages = []
-        for image in images:
-            result, _ = engine(str(image))
-            pages.append(_rapidocr_result_to_text(result or []))
+        data_path = tessdata.data_path()
+        with tesserocr.PyTessBaseAPI(
+            path=data_path,
+            lang="eng",
+            psm=tesserocr.PSM.SINGLE_BLOCK,
+        ) as engine:
+            for image in images:
+                with Image.open(image) as page_image:
+                    engine.SetImage(page_image)
+                    pages.append(engine.GetUTF8Text() or "")
         return pages
-
-
-def _rapidocr_result_to_text(result: list) -> str:
-    """Rebuild table lines from RapidOCR's positioned word boxes."""
-    words = []
-    for item in result:
-        if not item or len(item) < 2:
-            continue
-        box, value = item[0], str(item[1]).strip()
-        if not value or not box:
-            continue
-        left = min(float(point[0]) for point in box)
-        ys = [float(point[1]) for point in box]
-        centre_y = sum(ys) / len(ys)
-        height = max(ys) - min(ys)
-        words.append((centre_y, left, height, value))
-    words.sort()
-
-    lines: list[dict] = []
-    for centre_y, left, height, value in words:
-        chosen = None
-        for line in reversed(lines[-4:]):
-            tolerance = max(8.0, (height + line["height"]) * 0.35)
-            if abs(centre_y - line["centre_y"]) <= tolerance:
-                chosen = line
-                break
-        if chosen is None:
-            lines.append(
-                {
-                    "centre_y": centre_y,
-                    "height": height,
-                    "words": [(left, value)],
-                }
-            )
-        else:
-            chosen["words"].append((left, value))
-            count = len(chosen["words"])
-            chosen["centre_y"] = (
-                chosen["centre_y"] * (count - 1) + centre_y
-            ) / count
-            chosen["height"] = max(chosen["height"], height)
-    return "\n".join(
-        " ".join(value for _, value in sorted(line["words"]))
-        for line in lines
-    )
 
 
 def _normalized_product(raw: str) -> str:
